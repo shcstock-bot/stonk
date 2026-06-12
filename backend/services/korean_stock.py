@@ -2,6 +2,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import requests
+import yfinance as yf
 import os
 
 try:
@@ -24,6 +25,22 @@ def _get_dart_instance():
         _dart_cache["codes"] = dart.corp_codes
         _dart_cache["ts"] = now
     return _dart_cache["dart"], _dart_cache["codes"]
+
+
+def _get_yf_extra(ticker: str) -> dict:
+    for suffix in [".KS", ".KQ"]:
+        try:
+            info = yf.Ticker(ticker + suffix).info
+            if info and info.get("enterpriseToEbitda") is not None:
+                ev   = info.get("enterpriseToEbitda")
+                beta = info.get("beta")
+                return {
+                    "evebitda": f"{ev:.1f}x"   if ev   else "N/A",
+                    "beta":     f"{beta:.2f}"   if beta else "N/A",
+                }
+        except Exception:
+            continue
+    return {"evebitda": "N/A", "beta": "N/A"}
 
 
 def _naver_basic(ticker: str) -> dict:
@@ -133,11 +150,12 @@ def _naver_income_fallback(ticker: str) -> list[dict]:
 
 
 def get_korean_stock(ticker: str) -> dict:
-    # 3개 소스 병렬 호출
-    with ThreadPoolExecutor(max_workers=3) as ex:
+    # 4개 소스 병렬 호출
+    with ThreadPoolExecutor(max_workers=4) as ex:
         f_basic = ex.submit(_naver_basic, ticker)
         f_integ = ex.submit(_naver_integration, ticker)
         f_dart  = ex.submit(_dart_financials, ticker)
+        f_yf    = ex.submit(_get_yf_extra, ticker)
 
         try:
             basic = f_basic.result(timeout=10)
@@ -150,6 +168,7 @@ def get_korean_stock(ticker: str) -> dict:
             integ = {}
 
         dart_rows = f_dart.result(timeout=30)
+        yf_extra  = f_yf.result(timeout=15)
 
     if not basic.get("stockName"):
         return {"error": f"'{ticker}' 종목 데이터를 찾을 수 없습니다."}
@@ -236,9 +255,9 @@ def get_korean_stock(ticker: str) -> dict:
         "mktcap":   mktcap,
         "roe":      roe,
         "debt":     debt,
-        "evebitda": "N/A",
+        "evebitda": yf_extra["evebitda"],
         "div":      div,
-        "beta":     "N/A",
+        "beta":     yf_extra["beta"],
         "foreign":  foreign,
         "vol":      vol,
         "avgvol":   avgvol,
