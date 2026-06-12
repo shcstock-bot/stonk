@@ -1,14 +1,15 @@
 import re
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
 from services.korean_stock import get_korean_stock
 from services.us_stock import get_us_stock
+from services.search import search_stocks, name_to_code
 
-app = FastAPI(title="EquiSynth API")
+app = FastAPI(title="CheckStonk API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -18,11 +19,30 @@ app.add_middleware(
 )
 
 KR_TICKER_PATTERN = re.compile(r"^\d{6}$")
+KR_NAME_PATTERN   = re.compile(r"[가-힣]")
+
+
+@app.get("/api/search")
+async def search(q: str = Query(default="")):
+    if len(q) < 1:
+        return []
+    return search_stocks(q, limit=10)
 
 
 @app.get("/api/stock/{ticker}")
 async def get_stock(ticker: str):
-    ticker = ticker.strip().upper()
+    ticker = ticker.strip()
+
+    # 한글 이름 입력 → 코드로 변환
+    if KR_NAME_PATTERN.search(ticker):
+        code = name_to_code(ticker)
+        if not code:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(status_code=404, content={"error": f"'{ticker}' 종목을 찾을 수 없습니다."})
+        ticker = code
+
+    ticker = ticker.upper()
+
     if KR_TICKER_PATTERN.match(ticker):
         data = get_korean_stock(ticker)
     else:

@@ -104,10 +104,14 @@
             <h1 class="font-display-lg text-display-lg text-primary mb-3 tracking-tight">종목 리서치를 자동화하세요</h1>
             <p class="font-body-lg text-body-lg text-on-surface-variant mb-8 max-w-xl">티커를 입력하면 현재가, 재무지표, 3년치 손익을 즉시 분석합니다.</p>
             <div class="max-w-xl">
-                <div class="flex items-center border-b-2 border-outline-variant focus-within:border-primary transition-colors py-3 group">
-                    <span class="material-symbols-outlined text-outline group-focus-within:text-primary mr-3">search</span>
-                    <input id="ticker-input" class="w-full bg-transparent border-none focus:ring-0 font-body-lg text-body-lg placeholder:text-outline p-0" placeholder="티커 입력 (예: 005930, AAPL)" type="text" />
-                    <button id="search-btn" onclick="startResearch()" class="ml-4 bg-primary text-on-primary px-6 py-2.5 font-label-md text-label-md rounded-sm hover:opacity-90 whitespace-nowrap active:scale-95 transition-all">리서치 시작</button>
+                <div class="relative">
+                    <div class="flex items-center border-b-2 border-outline-variant focus-within:border-primary transition-colors py-3 group">
+                        <span class="material-symbols-outlined text-outline group-focus-within:text-primary mr-3">search</span>
+                        <input id="ticker-input" autocomplete="off" class="w-full bg-transparent border-none focus:ring-0 font-body-lg text-body-lg placeholder:text-outline p-0" placeholder="종목명 또는 코드 입력 (예: 삼성전자, AAPL)" type="text" />
+                        <button id="search-btn" onclick="startResearch()" class="ml-4 bg-primary text-on-primary px-6 py-2.5 font-label-md text-label-md rounded-sm hover:opacity-90 whitespace-nowrap active:scale-95 transition-all">리서치 시작</button>
+                    </div>
+                    <!-- 자동완성 드롭다운 -->
+                    <div id="autocomplete-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 bg-white border border-outline-variant rounded-md shadow-lg z-50 overflow-hidden"></div>
                 </div>
                 <div class="mt-3 flex gap-3 text-outline font-label-md text-label-md flex-wrap">
                     <span>바로 조회:</span>
@@ -411,11 +415,93 @@
         function saveToSheets() { alert('백엔드 연결 후 구글 시트에 자동 저장됩니다.\n/services/sheetsService.js 구현 필요'); }
         function sendKakao()    { alert('백엔드 연결 후 카카오로 알림이 전송됩니다.\n/services/kakaoService.js 구현 필요'); }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('ticker-input').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') startResearch();
+        // 자동완성
+        let acTimer = null;
+        let acIndex = -1;
+        let acItems = [];
+
+        const input    = document.getElementById('ticker-input');
+        const dropdown = document.getElementById('autocomplete-dropdown');
+
+        function hideDropdown() {
+            dropdown.classList.add('hidden');
+            dropdown.innerHTML = '';
+            acIndex = -1;
+            acItems = [];
+        }
+
+        function selectItem(code, name) {
+            input.value = code;
+            hideDropdown();
+            startResearch();
+        }
+
+        function renderDropdown(items) {
+            if (!items.length) { hideDropdown(); return; }
+            acItems = items;
+            acIndex = -1;
+            dropdown.innerHTML = items.map((item, i) =>
+                `<div class="ac-item flex items-center justify-between px-4 py-2.5 cursor-pointer hover:bg-surface-container-low font-body-md text-body-md text-on-surface"
+                      data-code="${item.code}" data-name="${item.name}">
+                    <span>${item.name}</span>
+                    <span class="text-outline text-sm ml-3">${item.code} <span class="text-xs">${item.market}</span></span>
+                 </div>`
+            ).join('');
+            dropdown.classList.remove('hidden');
+            dropdown.querySelectorAll('.ac-item').forEach(el => {
+                el.addEventListener('mousedown', e => {
+                    e.preventDefault();
+                    selectItem(el.dataset.code, el.dataset.name);
+                });
             });
+        }
+
+        function highlightItem(idx) {
+            dropdown.querySelectorAll('.ac-item').forEach((el, i) => {
+                el.classList.toggle('bg-surface-container-low', i === idx);
+            });
+        }
+
+        input.addEventListener('input', function() {
+            const q = this.value.trim();
+            clearTimeout(acTimer);
+            if (!q) { hideDropdown(); return; }
+            acTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(q)}`);
+                    const items = await res.json();
+                    renderDropdown(items);
+                } catch(e) { hideDropdown(); }
+            }, 250);
         });
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                if (acIndex >= 0 && acItems[acIndex]) {
+                    e.preventDefault();
+                    selectItem(acItems[acIndex].code, acItems[acIndex].name);
+                } else {
+                    hideDropdown();
+                    startResearch();
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                acIndex = Math.min(acIndex + 1, acItems.length - 1);
+                highlightItem(acIndex);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                acIndex = Math.max(acIndex - 1, -1);
+                highlightItem(acIndex);
+            } else if (e.key === 'Escape') {
+                hideDropdown();
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!input.contains(e.target) && !dropdown.contains(e.target)) hideDropdown();
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {});
     </script>
 </body>
 </html>
