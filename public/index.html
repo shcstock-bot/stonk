@@ -474,12 +474,9 @@
                             </div>`;
                         });
                         html += `</div>`;
-                        const dartUrl = data.corp_code
-                            ? `https://dart.fss.or.kr/dsab007/main.do?corp_code=${data.corp_code}&currentPage=1&maxResults=15&startPage=1`
-                            : `https://dart.fss.or.kr/dsab001/main.do`;
-                        html += `<a href="${dartUrl}" target="_blank"
+                        html += `<a href="https://finance.naver.com/item/news_notice.naver?code=${ticker}" target="_blank"
                             class="mt-3 flex items-center gap-1 font-caption text-caption text-secondary hover:underline" style="font-size:12px">
-                            <span class="material-symbols-outlined" style="font-size:13px">open_in_new</span>DART 전체 공시 보기
+                            <span class="material-symbols-outlined" style="font-size:13px">open_in_new</span>네이버 금융 공시 전체 보기
                         </a>`;
                     } else if (!data.summary) {
                         html = `<p class="font-caption text-caption text-outline">최근 공시가 없습니다.</p>`;
