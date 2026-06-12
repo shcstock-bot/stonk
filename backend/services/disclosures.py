@@ -24,7 +24,7 @@ def get_disclosure_summary(ticker: str) -> dict:
         if match.empty:
             return {"items": [], "summary": "종목 정보를 찾을 수 없습니다."}
 
-        corp_code = match.iloc[0]["corp_code"]
+        corp_code = str(match.iloc[0]["corp_code"]).zfill(8)
         end_dt = datetime.now()
         start_dt = end_dt - timedelta(days=90)
 
@@ -78,6 +78,6 @@ def get_disclosure_summary(ticker: str) -> dict:
         except Exception:
             summary = ""
 
-    result = {"items": items, "summary": summary}
+    result = {"items": items, "summary": summary, "corp_code": corp_code}
     _cache[ticker] = {"data": result, "ts": now}
     return result
