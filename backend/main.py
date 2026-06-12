@@ -1,6 +1,8 @@
+import os
 import re
+from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
@@ -9,7 +11,27 @@ from services.korean_stock import get_korean_stock
 from services.us_stock import get_us_stock
 from services.search import search_stocks, name_to_code
 
-app = FastAPI(title="CheckStonk API")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from db import init_db
+    init_db()
+
+    bot_token   = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL", "")
+    if bot_token and webhook_url:
+        from services.telegram_bot import set_webhook
+        set_webhook(f"{webhook_url.rstrip('/')}/api/telegram/webhook")
+
+    from services.scheduler import start_scheduler
+    _scheduler = start_scheduler()
+
+    yield
+
+    _scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="CheckStonk API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,6 +96,14 @@ async def get_disclosures(ticker: str):
     else:
         from services.us_disclosures import get_us_disclosure_summary
         return get_us_disclosure_summary(ticker)
+
+
+@app.post("/api/telegram/webhook")
+async def telegram_webhook(request: Request):
+    update = await request.json()
+    from services.telegram_bot import handle_update
+    handle_update(update)
+    return {"ok": True}
 
 
 @app.get("/health")
