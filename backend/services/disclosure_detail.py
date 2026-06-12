@@ -50,16 +50,22 @@ def get_disclosure_detail_summary(rcept_no: str, title: str = "", date: str = ""
     try:
         from groq import Groq
 
+        guidelines = (
+            "작성 규칙: "
+            "① 회사명은 절대 언급하지 말 것 "
+            "② 인명은 한글 이름만 사용 (한자·영문 표기 제거, 예: 朴泰勳·PARKTAEHOON → 박태훈) "
+            "③ 각 줄은 '•'로 시작, 한 줄 20자 이내 "
+            "④ 서두 없이 바로 핵심만"
+        )
         if content_text:
             prompt = (
-                f"DART 공시 문서 ({date} · {title}) 핵심을 3줄로 요약하세요. "
-                "각 줄 '•'로 시작, 한 줄에 20자 이내, 서두 없이 바로.\n\n"
-                f"{content_text}"
+                f"DART 공시 문서 ({date} · {title}) 핵심을 3줄로 요약하세요.\n"
+                f"{guidelines}\n\n{content_text}"
             )
         else:
             prompt = (
-                f"DART 공시 '{title}' ({date}) 의 투자자 관점 의미를 3줄로 설명하세요. "
-                "각 줄 '•'로 시작, 한 줄에 20자 이내, 서두 없이 바로."
+                f"DART 공시 '{title}' ({date}) 의 투자자 관점 의미를 3줄로 설명하세요.\n"
+                f"{guidelines}"
             )
 
         client = Groq(api_key=GROQ_API_KEY)
