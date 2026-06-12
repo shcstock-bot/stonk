@@ -68,7 +68,7 @@ def get_disclosure_summary(ticker: str) -> dict:
                 "불필요한 서두 없이 핵심만 작성하세요.\n\n"
                 f"{titles}"
             )
-            resp = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
+            resp = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
             summary = resp.text
         except Exception as e:
             summary = f"[오류: {type(e).__name__}: {str(e)[:80]}]"

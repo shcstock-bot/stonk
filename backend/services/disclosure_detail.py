@@ -66,7 +66,7 @@ def get_disclosure_detail_summary(rcept_no: str, title: str = "", date: str = ""
                 "각 줄은 '•' 으로 시작하고 줄바꿈으로 구분하세요. 서두 없이 바로 시작하세요."
             )
 
-        summary = client.models.generate_content(model="gemini-1.5-flash", contents=prompt).text.strip()
+        summary = client.models.generate_content(model="gemini-2.0-flash", contents=prompt).text.strip()
     except Exception as e:
         summary = f"오류: {type(e).__name__}: {str(e)[:120]}"
 
