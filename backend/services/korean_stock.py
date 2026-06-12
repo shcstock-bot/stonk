@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 from pykrx import stock as pykrx_stock
 import FinanceDataReader as fdr
 try:
@@ -12,6 +14,12 @@ import os
 
 DART_API_KEY = os.getenv("DART_API_KEY", "")
 _NAVER_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120"}
+
+# 모듈 레벨 캐시 (서버 재시작 전까지 유지)
+_krx_cache = {"data": None, "ts": 0}
+_dart_cache = {"dart": None, "codes": None, "ts": 0}
+_KRX_TTL  = 6 * 3600   # 6시간
+_DART_TTL = 24 * 3600  # 24시간
 
 
 def _today() -> str:
@@ -40,77 +48,67 @@ def _safe(val, fallback="N/A"):
     return val
 
 
-def _get_name_and_sector(ticker: str) -> tuple[str, str]:
+def _get_krx_listing():
+    now = time.time()
+    if _krx_cache["data"] is None or now - _krx_cache["ts"] > _KRX_TTL:
+        _krx_cache["data"] = fdr.StockListing("KRX")
+        _krx_cache["ts"] = now
+    return _krx_cache["data"]
+
+
+def _get_dart_instance():
+    now = time.time()
+    if _dart_cache["codes"] is None or now - _dart_cache["ts"] > _DART_TTL:
+        dart = odr(DART_API_KEY)
+        _dart_cache["dart"] = dart
+        _dart_cache["codes"] = dart.corp_codes
+        _dart_cache["ts"] = now
+    return _dart_cache["dart"], _dart_cache["codes"]
+
+
+def _get_name_sector_mktcap(ticker: str) -> tuple[str, str, str]:
     try:
-        listing = fdr.StockListing("KRX")
+        listing = _get_krx_listing()
         row = listing[listing["Code"] == ticker]
         if not row.empty:
-            name = str(row.iloc[0].get("Name", "") or "")
+            name   = str(row.iloc[0].get("Name", "") or "")
             sector = str(row.iloc[0].get("Industry", "") or row.iloc[0].get("Sector", "") or "")
-            return name, sector
+            mc     = float(row.iloc[0].get("Marcap", 0) or 0)
+            mktcap = _fmt_large_krw(mc) if mc else "N/A"
+            return name, sector, mktcap
     except Exception:
         pass
-    return ticker, ""
+    return ticker, "", "N/A"
 
 
 def _get_naver_fundamentals(ticker: str) -> dict:
-    """네이버 금융에서 PER, PBR, EPS, 시가총액, 배당수익률, 외국인보유 스크래핑"""
     try:
         url = f"https://finance.naver.com/item/main.naver?code={ticker}"
-        r = requests.get(url, headers=_NAVER_HEADERS, timeout=10)
+        r = requests.get(url, headers=_NAVER_HEADERS, timeout=8)
         soup = BeautifulSoup(r.text, "html.parser")
 
         def em(id_: str) -> str:
             tag = soup.find("em", id=id_)
             return tag.text.strip().replace(",", "") if tag else ""
 
-        per     = em("_per")
-        eps     = em("_eps")
-        pbr     = em("_pbr")
-        dvr     = em("_dvr")
-        mktcap  = em("_market_sum")  # 조 단위 문자열 포함
-
-        # 외국인 보유 비율
-        foreign_tag = soup.select_one("div.section_company span.blind")
-        foreign = ""
-        for tag in soup.find_all("td", class_="cmp-table-cell"):
-            pass  # 복잡한 구조, 별도 API로 처리
-
+        per = em("_per")
+        eps = em("_eps")
+        pbr = em("_pbr")
+        dvr = em("_dvr")
         return {
-            "per":    f"{float(per):.1f}x"  if per  else "N/A",
-            "pbr":    f"{float(pbr):.1f}x"  if pbr  else "N/A",
-            "eps":    f"{int(eps):,}원"      if eps  else "N/A",
-            "div":    f"{float(dvr):.2f}%"   if dvr  else "N/A",
-            "mktcap_raw": mktcap,
+            "per": f"{float(per):.1f}x" if per else "N/A",
+            "pbr": f"{float(pbr):.1f}x" if pbr else "N/A",
+            "eps": f"{int(eps):,}원"    if eps else "N/A",
+            "div": f"{float(dvr):.2f}%" if dvr else "N/A",
         }
     except Exception:
         return {}
 
 
-def _get_naver_foreign(ticker: str) -> str:
-    """네이버 금융 외국인 보유 비율"""
-    try:
-        url = f"https://finance.naver.com/item/main.naver?code={ticker}"
-        r = requests.get(url, headers=_NAVER_HEADERS, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-        # 외국인 비율 위치: div.section_buy table에서 찾기
-        for tr in soup.select("table.per_table tr"):
-            th = tr.find("th")
-            td = tr.find("td")
-            if th and td and "외국인" in th.text:
-                val = td.text.strip().replace("%", "").replace(",", "")
-                return f"{float(val):.1f}%"
-    except Exception:
-        pass
-    return "N/A"
-
-
 def _get_yf_extra(ticker: str) -> dict:
-    """yfinance로 ROE, 부채비율, EV/EBITDA, 베타 (한국 주식 .KS/.KQ)"""
     for suffix in [".KS", ".KQ"]:
         try:
-            t = yf.Ticker(ticker + suffix)
-            info = t.info
+            info = yf.Ticker(ticker + suffix).info
             if info and info.get("returnOnEquity") is not None:
                 roe  = _safe(info.get("returnOnEquity"))
                 debt = _safe(info.get("debtToEquity"))
@@ -127,69 +125,74 @@ def _get_yf_extra(ticker: str) -> dict:
     return {"roe": "N/A", "debt": "N/A", "evebitda": "N/A", "beta": "N/A"}
 
 
+def _fetch_finstate_year(dart, corp_code: str, year: int) -> dict | None:
+    try:
+        fs = dart.finstate(corp_code, year, "11011")
+        if fs is None or fs.empty:
+            fs = dart.finstate(corp_code, year, "11001")
+        if fs is None or fs.empty:
+            return None
+        is_df = fs[fs["sj_div"] == "IS"]
+
+        def extract(keywords):
+            for kw in keywords:
+                m = is_df[is_df["account_nm"].str.contains(kw, na=False)]
+                if not m.empty:
+                    raw = str(m.iloc[0].get("thstrm_amount", "0") or "0")
+                    try:
+                        return int(raw.replace(",", ""))
+                    except Exception:
+                        return 0
+            return 0
+
+        rev = extract(["매출액", "수익(매출액)"])
+        op  = extract(["영업이익"])
+        net = extract(["당기순이익"])
+        return {"year": str(year), "rev": rev // 100_000_000, "op": op // 100_000_000, "net": net // 100_000_000}
+    except Exception:
+        return None
+
+
 def get_dart_financials(ticker: str) -> list[dict]:
-    """DART에서 최근 3개 연도 손익 데이터 (억 원 단위)"""
     if not DART_API_KEY:
         return []
     try:
-        dart = odr(DART_API_KEY)
-        codes = dart.corp_codes
+        dart, codes = _get_dart_instance()
         match = codes[codes["stock_code"] == ticker]
         if match.empty:
             return []
         corp_code = match.iloc[0]["corp_code"]
-
-        rows = []
         current_year = datetime.now().year
-        for year in range(current_year - 3, current_year):
-            try:
-                fs = dart.finstate(corp_code, year, "11011")  # 연결
-                if fs is None or fs.empty:
-                    fs = dart.finstate(corp_code, year, "11001")  # 별도
-                if fs is None or fs.empty:
-                    continue
+        years = range(current_year - 3, current_year)
 
-                is_df = fs[fs["sj_div"] == "IS"]
-
-                def extract(keywords: list[str]) -> int:
-                    for kw in keywords:
-                        m = is_df[is_df["account_nm"].str.contains(kw, na=False)]
-                        if not m.empty:
-                            raw = str(m.iloc[0].get("thstrm_amount", "0") or "0")
-                            try:
-                                return int(raw.replace(",", ""))
-                            except Exception:
-                                return 0
-                    return 0
-
-                rev = extract(["매출액", "수익(매출액)"])
-                op  = extract(["영업이익"])
-                net = extract(["당기순이익"])
-                rows.append({"year": str(year), "rev": rev // 100_000_000, "op": op // 100_000_000, "net": net // 100_000_000})
-            except Exception:
-                continue
-        return rows
+        # 3개 연도 병렬 조회
+        results = {}
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            futs = {ex.submit(_fetch_finstate_year, dart, corp_code, y): y for y in years}
+            for f in as_completed(futs):
+                y = futs[f]
+                row = f.result()
+                if row:
+                    results[y] = row
+        return [results[y] for y in sorted(results)]
     except Exception:
         return []
 
 
 def _get_naver_income(ticker: str) -> list[dict]:
-    """네이버 금융에서 연간 손익 데이터 (DART 키 없을 때 사용)"""
     try:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/finance/summary"
-        r = requests.get(url, headers=_NAVER_HEADERS, timeout=10)
+        r = requests.get(url, headers=_NAVER_HEADERS, timeout=8)
         data = r.json()
         annual = data.get("chartIncomeStatement", {}).get("annual", {})
         cols = annual.get("columns", [])
         if not cols or len(cols) < 3:
             return []
-
-        years = cols[0][1:]    # 연도 라벨
-        revs  = cols[1][1:]    # 매출액
-        ops   = cols[2][1:]    # 영업이익
-
+        years = cols[0][1:]
+        revs  = cols[1][1:]
+        ops   = cols[2][1:]
         rows = []
-        for i, year_label in enumerate(years[:3]):  # 최근 실적 3개년
+        for i, year_label in enumerate(years[:3]):
             year = year_label.replace(".", "")[:4]
             try:
                 rev = int(str(revs[i]).replace(",", "")) if revs[i] else 0
@@ -202,22 +205,30 @@ def _get_naver_income(ticker: str) -> list[dict]:
         return []
 
 
+def _get_foreign(ticker: str, from_1m: str, today: str) -> str:
+    try:
+        f_df = pykrx_stock.get_exhaustion_rates_of_foreign_investment_by_date(from_1m, today, ticker)
+        if not f_df.empty:
+            col = "보유비율" if "보유비율" in f_df.columns else f_df.columns[-1]
+            return f"{float(f_df.iloc[-1][col]):.1f}%"
+    except Exception:
+        pass
+    return "N/A"
+
+
 def get_korean_stock(ticker: str) -> dict:
-    today  = _today()
+    today   = _today()
     from_1m = _date_n_days_ago(30)
     from_1y = _date_n_days_ago(380)
 
-    # 종목명, 섹터
-    name, sector = _get_name_and_sector(ticker)
-
-    # pykrx: 가격/거래량
+    # 가격/거래량 먼저 (ticker 유효성 확인)
     try:
         ohlcv = pykrx_stock.get_market_ohlcv_by_date(from_1m, today, ticker)
         if ohlcv.empty:
             raise ValueError("empty")
-        latest    = ohlcv.iloc[-1]
-        prev      = ohlcv.iloc[-2] if len(ohlcv) > 1 else latest
-        close     = int(latest["종가"])
+        latest     = ohlcv.iloc[-1]
+        prev       = ohlcv.iloc[-2] if len(ohlcv) > 1 else latest
+        close      = int(latest["종가"])
         prev_close = int(prev["종가"])
         change_val = close - prev_close
         change_pct = (change_val / prev_close * 100) if prev_close else 0
@@ -226,45 +237,28 @@ def get_korean_stock(ticker: str) -> dict:
     except Exception:
         return {"error": f"'{ticker}' 종목 데이터를 찾을 수 없습니다."}
 
-    # pykrx: 52주 고/저 + 평균거래량
-    try:
-        hist_1y = pykrx_stock.get_market_ohlcv_by_date(from_1y, today, ticker)
-        high52  = int(hist_1y["고가"].max())
-        low52   = int(hist_1y["저가"].min())
-        avgvol  = int(hist_1y["거래량"].tail(20).mean()) if len(hist_1y) >= 20 else vol
-    except Exception:
-        high52, low52, avgvol = 0, 0, vol
+    # 나머지 5개 소스 병렬 호출
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        f_hist    = ex.submit(pykrx_stock.get_market_ohlcv_by_date, from_1y, today, ticker)
+        f_info    = ex.submit(_get_name_sector_mktcap, ticker)
+        f_naver   = ex.submit(_get_naver_fundamentals, ticker)
+        f_yf      = ex.submit(_get_yf_extra, ticker)
+        f_income  = ex.submit(lambda: get_dart_financials(ticker) or _get_naver_income(ticker))
+        f_foreign = ex.submit(_get_foreign, ticker, from_1m, today)
 
-    # 네이버 금융: PER, PBR, EPS, 배당수익률, 시가총액
-    naver = _get_naver_fundamentals(ticker)
-    mktcap_raw = naver.pop("mktcap_raw", "")
+        try:
+            hist_1y = f_hist.result(timeout=15)
+            high52  = int(hist_1y["고가"].max())
+            low52   = int(hist_1y["저가"].min())
+            avgvol  = int(hist_1y["거래량"].tail(20).mean()) if len(hist_1y) >= 20 else vol
+        except Exception:
+            high52, low52, avgvol = 0, 0, vol
 
-    # 시가총액 파싱 (네이버는 "X,XXX조" 형식)
-    mktcap = "N/A"
-    try:
-        listing = fdr.StockListing("KRX")
-        row = listing[listing["Code"] == ticker]
-        if not row.empty:
-            mc = float(row.iloc[0].get("Marcap", 0) or 0)
-            mktcap = _fmt_large_krw(mc)
-    except Exception:
-        pass
-
-    # yfinance: ROE, 부채비율, EV/EBITDA, 베타
-    yf_extra = _get_yf_extra(ticker)
-
-    # 외국인 보유 비율 (pykrx 시도)
-    foreign = "N/A"
-    try:
-        f_df = pykrx_stock.get_exhaustion_rates_of_foreign_investment_by_date(from_1m, today, ticker)
-        if not f_df.empty:
-            col = "보유비율" if "보유비율" in f_df.columns else f_df.columns[-1]
-            foreign = f"{float(f_df.iloc[-1][col]):.1f}%"
-    except Exception:
-        pass
-
-    # 손익 데이터: DART (키 있을 때) 또는 네이버 금융
-    income = get_dart_financials(ticker) or _get_naver_income(ticker)
+        name, sector, mktcap = f_info.result(timeout=15)
+        naver    = f_naver.result(timeout=15)
+        yf_extra = f_yf.result(timeout=15)
+        income   = f_income.result(timeout=30)
+        foreign  = f_foreign.result(timeout=15)
 
     return {
         "ticker":   ticker,

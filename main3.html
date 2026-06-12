@@ -304,6 +304,9 @@
 
         const API_BASE = 'https://checkstonk.onrender.com';
 
+        // 페이지 로드 시 서버 미리 웜업 (콜드 스타트 방지)
+        fetch(`${API_BASE}/health`).catch(() => {});
+
         async function startResearch() {
             const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
             if (!ticker) { showError('티커를 입력해주세요.'); return; }
