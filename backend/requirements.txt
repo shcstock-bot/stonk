@@ -1,7 +1,7 @@
 fastapi==0.111.0
 uvicorn==0.29.0
 pykrx==1.0.45
-opendartreader==0.1.7
+opendartreader==0.3.2
 yfinance==0.2.40
 FinanceDataReader==0.9.50
 python-dotenv==1.0.1
