@@ -312,7 +312,16 @@
         fetch(`${API_BASE}/health`).catch(() => {});
 
         async function startResearch() {
-            const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
+            // 드롭다운 선택 시 저장된 코드 우선 사용, 아니면 입력값에서 "이름(코드)" 파싱
+            let raw = document.getElementById('ticker-input').value.trim();
+            let ticker;
+            if (_selectedCode) {
+                ticker = _selectedCode.toUpperCase();
+                _selectedCode = null;
+            } else {
+                const m = raw.match(/\(([^)]+)\)\s*$/);
+                ticker = (m ? m[1] : raw).toUpperCase();
+            }
             if (!ticker) { showError('티커를 입력해주세요.'); return; }
             showLoading();
             try {
@@ -419,6 +428,7 @@
         let acTimer = null;
         let acIndex = -1;
         let acItems = [];
+        let _selectedCode = null;
 
         const input    = document.getElementById('ticker-input');
         const dropdown = document.getElementById('autocomplete-dropdown');
@@ -431,7 +441,9 @@
         }
 
         function selectItem(code, name) {
-            input.value = code;
+            clearTimeout(acTimer);
+            _selectedCode = code;
+            input.value = `${name}(${code})`;
             hideDropdown();
             startResearch();
         }
@@ -463,6 +475,7 @@
         }
 
         input.addEventListener('input', function() {
+            _selectedCode = null;
             const q = this.value.trim();
             clearTimeout(acTimer);
             if (!q) { hideDropdown(); return; }
