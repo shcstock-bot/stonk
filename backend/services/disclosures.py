@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timedelta
 
 DART_API_KEY = os.getenv("DART_API_KEY", "")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 _cache: dict = {}
 _TTL = 3600  # 1시간
@@ -56,25 +56,20 @@ def get_disclosure_summary(ticker: str) -> dict:
             item["date"] = f"{d[:4]}.{d[4:6]}.{d[6:]}"
 
     summary = ""
-    if ANTHROPIC_API_KEY and items:
+    if GEMINI_API_KEY and items:
         try:
-            from anthropic import Anthropic
+            import google.generativeai as genai
+            genai.configure(api_key=GEMINI_API_KEY)
+            model = genai.GenerativeModel("gemini-1.5-flash")
             titles = "\n".join(f"- {i['date']}: {i['title']}" for i in items)
-            client = Anthropic(api_key=ANTHROPIC_API_KEY)
-            msg = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=300,
-                messages=[{
-                    "role": "user",
-                    "content": (
-                        f"다음은 {ticker} 종목의 최근 공시 목록입니다. "
-                        "투자자 관점에서 주요 내용을 2~3줄로 간결하게 요약해주세요. "
-                        "불필요한 서두 없이 핵심만 작성하세요.\n\n"
-                        f"{titles}"
-                    ),
-                }],
+            prompt = (
+                f"다음은 {ticker} 종목의 최근 공시 목록입니다. "
+                "투자자 관점에서 주요 내용을 2~3줄로 간결하게 요약해주세요. "
+                "불필요한 서두 없이 핵심만 작성하세요.\n\n"
+                f"{titles}"
             )
-            summary = msg.content[0].text
+            resp = model.generate_content(prompt)
+            summary = resp.text
         except Exception:
             summary = ""
 

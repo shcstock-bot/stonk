@@ -9,4 +9,4 @@ httpx
 requests
 beautifulsoup4
 lxml
-anthropic
+google-generativeai
