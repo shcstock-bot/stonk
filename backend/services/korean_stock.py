@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta
 from pykrx import stock as pykrx_stock
 import FinanceDataReader as fdr
-import OpenDartReader as odr
+try:
+    import OpenDartReader as odr
+except ImportError:
+    from opendartreader import OpenDartReader as odr
 import yfinance as yf
 import requests
 from bs4 import BeautifulSoup
