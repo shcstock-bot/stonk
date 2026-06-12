@@ -1,4 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+KST = timezone(timedelta(hours=9))
 import yfinance as yf
 
 
@@ -122,10 +124,9 @@ def get_us_stock(ticker: str) -> dict:
         pass
 
     asof_ts = info.get("regularMarketTime")
-    if asof_ts:
-        asof = datetime.fromtimestamp(asof_ts).strftime("As of %b %d, %Y close")
-    else:
-        asof = f"As of {datetime.now().strftime('%b %d, %Y')}"
+    _ref = datetime.fromtimestamp(asof_ts, KST) if asof_ts else datetime.now(KST)
+    _hour = _ref.strftime("%I").lstrip("0") or "12"
+    asof = _ref.strftime(f"%Y.%m.%d {_hour}:%M") + _ref.strftime("%p").upper() + " 기준"
 
     return {
         "ticker": ticker,
