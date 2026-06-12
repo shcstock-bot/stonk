@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import requests
 
 DART_API_KEY = os.getenv("DART_API_KEY", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 _cache: dict = {}
 _TTL = 3600
@@ -82,10 +82,10 @@ def get_disclosure_summary(ticker: str) -> dict:
         })
 
     summary = ""
-    if GEMINI_API_KEY and items:
+    if GROQ_API_KEY and items:
         try:
-            from google import genai as _genai
-            client = _genai.Client(api_key=GEMINI_API_KEY)
+            from groq import Groq
+            client = Groq(api_key=GROQ_API_KEY)
             titles = "\n".join(f"- {i['date']}: {i['title']}" for i in items)
             prompt = (
                 f"다음은 {ticker} 종목의 최근 공시 목록입니다. "
@@ -93,10 +93,14 @@ def get_disclosure_summary(ticker: str) -> dict:
                 "불필요한 서두 없이 핵심만 작성하세요.\n\n"
                 f"{titles}"
             )
-            resp = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-            summary = resp.text
+            resp = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[{"role": "user", "content": prompt}],
+            )
+            summary = resp.choices[0].message.content
         except Exception as e:
-            summary = f"[오류: {type(e).__name__}: {str(e)[:80]}]"
+            msg = str(e)
+            summary = "AI 요약을 잠시 후 다시 시도해주세요. (API 한도)" if "429" in msg else f"[오류: {msg[:80]}]"
 
     result = {"items": items, "summary": summary, "corp_code": corp_code}
     _cache[ticker] = {"data": result, "ts": now}

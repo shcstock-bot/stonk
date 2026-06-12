@@ -7,7 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 
 DART_API_KEY = os.getenv("DART_API_KEY", "")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 _cache: dict = {}
 _TTL = 3600
@@ -42,15 +42,13 @@ def get_disclosure_detail_summary(rcept_no: str, title: str = "", date: str = ""
     if rcept_no in _cache and time.time() - _cache[rcept_no]["ts"] < _TTL:
         return _cache[rcept_no]["data"]
 
-    if not GEMINI_API_KEY:
-        return {"summary": "Gemini API 키가 설정되지 않았습니다."}
+    if not GROQ_API_KEY:
+        return {"summary": "GROQ_API_KEY가 설정되지 않았습니다."}
 
     content_text = _fetch_dart_text(rcept_no)
 
     try:
-        from google import genai as _genai
-
-        client = _genai.Client(api_key=GEMINI_API_KEY)
+        from groq import Groq
 
         if content_text:
             prompt = (
@@ -66,9 +64,17 @@ def get_disclosure_detail_summary(rcept_no: str, title: str = "", date: str = ""
                 "각 줄은 '•' 으로 시작하고 줄바꿈으로 구분하세요. 서두 없이 바로 시작하세요."
             )
 
-        summary = client.models.generate_content(model="gemini-2.0-flash", contents=prompt).text.strip()
+        client = Groq(api_key=GROQ_API_KEY)
+        resp = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        summary = resp.choices[0].message.content.strip()
     except Exception as e:
-        summary = f"오류: {type(e).__name__}: {str(e)[:120]}"
+        msg = str(e)
+        if "429" in msg:
+            return {"summary": "잠시 후 다시 클릭해주세요. (API 한도)"}  # 429는 캐시 안 함
+        summary = f"오류: {msg[:120]}"
 
     result = {"summary": summary}
     _cache[rcept_no] = {"data": result, "ts": time.time()}

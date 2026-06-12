@@ -9,4 +9,4 @@ httpx
 requests
 beautifulsoup4
 lxml
-google-genai
+groq
