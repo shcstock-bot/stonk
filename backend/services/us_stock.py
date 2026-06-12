@@ -80,9 +80,22 @@ def get_us_stock(ticker: str) -> dict:
     beta_raw = _safe(info.get("beta"))
     beta = f"{beta_raw:.2f}" if beta_raw != "N/A" else "N/A"
 
-    # 거래량
-    vol = str(_safe(info.get("regularMarketVolume"), 0))
-    avgvol = str(_safe(info.get("averageVolume"), 0))
+    # 거래대금 (USD) = volume × price
+    def _fmt_usd_vol(v: float) -> str:
+        if v >= 1_000_000_000_000:
+            return f"${v / 1_000_000_000_000:.2f}T"
+        if v >= 1_000_000_000:
+            return f"${v / 1_000_000_000:.2f}B"
+        if v >= 1_000_000:
+            return f"${v / 1_000_000:.2f}M"
+        return f"${v:,.0f}"
+
+    vol_cnt = _safe(info.get("regularMarketVolume"), None)
+    avg_cnt = _safe(info.get("averageVolume"), None)
+    price_num = _safe(info.get("currentPrice") or info.get("regularMarketPrice"), None)
+
+    vol = _fmt_usd_vol(vol_cnt * price_num) if vol_cnt and price_num else "N/A"
+    avgvol = _fmt_usd_vol(avg_cnt * price_num) if avg_cnt and price_num else "N/A"
 
     # 52주 고/저
     high52_raw = _safe(info.get("fiftyTwoWeekHigh"))

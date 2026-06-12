@@ -1,5 +1,6 @@
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import re
 import time
 import requests
 import yfinance as yf
@@ -225,17 +226,39 @@ def get_korean_stock(ticker: str) -> dict:
     high52 = f"{int(h52):,}원" if h52.isdigit() else "N/A"
     low52  = f"{int(l52):,}원" if l52.isdigit() else "N/A"
 
-    vol_raw = gi("accumulatedTradingVolume").replace(",", "")
-    vol = vol_raw if vol_raw.isdigit() else "0"
+    def _fmt_won(v: int) -> str:
+        if v >= 1_000_000_000_000:
+            return f"{v / 1_000_000_000_000:.1f}조원"
+        if v >= 100_000_000:
+            return f"{v / 100_000_000:.1f}억원"
+        if v >= 10_000:
+            return f"{v / 10_000:.1f}만원"
+        return f"{v:,}원"
 
-    # 평균 거래량: integration의 최근 5거래일 dealTrendInfos 평균
+    def _parse_tradeval(s: str) -> int | None:
+        m = re.search(r'[\d,]+', str(s))
+        if not m:
+            return None
+        try:
+            return int(m.group().replace(",", "")) * 1_000_000  # 백만원 단위
+        except Exception:
+            return None
+
+    tv = _parse_tradeval(gi("accumulatedTradingValue"))
+    vol = _fmt_won(tv) if tv is not None else "N/A"
+
     avgvol = "N/A"
     try:
         trends = integ.get("dealTrendInfos", [])
         if trends:
-            vols = [int(t["accumulatedTradingVolume"].replace(",", "")) for t in trends if t.get("accumulatedTradingVolume")]
-            if vols:
-                avgvol = str(sum(vols) // len(vols))
+            vals = []
+            for t in trends:
+                price_s = str(t.get("closePrice", "")).replace(",", "")
+                vol_s   = str(t.get("accumulatedTradingVolume", "")).replace(",", "")
+                if price_s.isdigit() and vol_s.isdigit():
+                    vals.append(int(price_s) * int(vol_s))
+            if vals:
+                avgvol = _fmt_won(sum(vals) // len(vals))
     except Exception:
         pass
 
