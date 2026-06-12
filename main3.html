@@ -360,7 +360,9 @@
             document.getElementById('ticker-input').focus();
         }
 
-        const API_BASE = 'https://checkstonk.onrender.com';
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? 'http://localhost:8000'
+            : 'https://checkstonk.onrender.com';
 
         // 페이지 로드 시 서버 미리 웜업 (콜드 스타트 방지)
         fetch(`${API_BASE}/health`).catch(() => {});
