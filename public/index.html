@@ -278,14 +278,14 @@
                         <div class="sub">외국인 보유 비율</div>
                     </div>
                     <div class="metric-card">
-                        <div class="label">거래량</div>
+                        <div class="label">거래대금</div>
                         <div id="r-vol" class="value"></div>
-                        <div class="sub">당일 거래량</div>
+                        <div class="sub">당일 거래대금</div>
                     </div>
                     <div class="metric-card">
-                        <div class="label">평균 거래량</div>
+                        <div class="label">평균 거래대금</div>
                         <div id="r-avgvol" class="value"></div>
-                        <div class="sub">20일 평균</div>
+                        <div class="sub">5일 평균</div>
                     </div>
                 </div>
             </div>
@@ -441,8 +441,8 @@
             // 시장 데이터
             document.getElementById('r-beta').textContent = d.beta;
             document.getElementById('r-foreign').textContent = d.foreign;
-            document.getElementById('r-vol').textContent = fmt(d.vol);
-            document.getElementById('r-avgvol').textContent = fmt(d.avgvol);
+            document.getElementById('r-vol').textContent = d.vol || 'N/A';
+            document.getElementById('r-avgvol').textContent = d.avgvol || 'N/A';
 
             // 52주
             document.getElementById('r-52high').textContent = d.high52;

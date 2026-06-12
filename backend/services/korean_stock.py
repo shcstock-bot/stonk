@@ -226,22 +226,30 @@ def get_korean_stock(ticker: str) -> dict:
     high52 = f"{int(h52):,}원" if h52.isdigit() else "N/A"
     low52  = f"{int(l52):,}원" if l52.isdigit() else "N/A"
 
-    # 거래량 (주 수)
-    vol_raw = gi("accumulatedTradingVolume").replace(",", "")
-    vol = vol_raw if vol_raw.isdigit() else "N/A"
+    def _fmt_won(v: int) -> str:
+        if v >= 1_000_000_000_000:
+            return f"{v / 1_000_000_000_000:.1f}조원"
+        if v >= 100_000_000:
+            return f"{v / 100_000_000:.1f}억원"
+        return f"{v:,}원"
 
-    # 평균 거래량: dealTrendInfos 최근 거래일 평균
+    # 거래대금 (당일)
+    tv_raw = gi("accumulatedTradingValue").replace(",", "")
+    vol = _fmt_won(int(tv_raw) * 1_000_000) if tv_raw.isdigit() else "N/A"
+
+    # 평균 거래대금: dealTrendInfos 기준 price × volume 평균
     avgvol = "N/A"
     try:
         trends = integ.get("dealTrendInfos", [])
         if trends:
-            vols = []
+            vals = []
             for t in trends:
+                p = str(t.get("closePrice", "")).replace(",", "")
                 v = str(t.get("accumulatedTradingVolume", "")).replace(",", "")
-                if v.isdigit():
-                    vols.append(int(v))
-            if vols:
-                avgvol = str(sum(vols) // len(vols))
+                if p.isdigit() and v.isdigit():
+                    vals.append(int(p) * int(v))
+            if vals:
+                avgvol = _fmt_won(sum(vals) // len(vals))
     except Exception:
         pass
 
