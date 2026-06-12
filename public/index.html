@@ -74,9 +74,12 @@
         .hero-gradient { background: radial-gradient(circle at 50% 50%, rgba(2,108,78,0.03) 0%, rgba(251,249,249,0) 70%); }
         .spinner { border: 3px solid #e3e2e2; border-top: 3px solid #026c4e; border-radius: 50%; width: 32px; height: 32px; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-        #result-section { display: none; }
+        #result-wrapper { display: none; }
         #error-section { display: none; }
         #loading-section { display: none; }
+        .spinner-sm { border: 2px solid #e3e2e2; border-top: 2px solid #026c4e; border-radius: 50%; width: 14px; height: 14px; animation: spin 0.8s linear infinite; display: inline-block; vertical-align: middle; }
+        .disc-item { padding: 8px 0; border-bottom: 1px solid #e3e2e2; }
+        .disc-item:last-child { border-bottom: none; }
         .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #444748; margin-bottom: 12px; }
         .metric-card { background: #fff; border: 1px solid #c4c7c7; border-radius: 2px; padding: 18px 20px; }
         .metric-card .label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #747878; margin-bottom: 6px; }
@@ -141,7 +144,25 @@
         </section>
 
         <!-- ===== 결과 영역 ===== -->
-        <section id="result-section" class="pt-10 space-y-10">
+        <div id="result-wrapper">
+        <div class="flex flex-col lg:flex-row gap-8 items-start pt-10">
+
+        <!-- 우측 사이드바: AI 공시 요약 (한국 주식만) -->
+        <aside id="disclosure-sidebar" class="hidden lg:order-last w-full lg:w-64 shrink-0 lg:sticky lg:top-24 rounded-lg border border-outline-variant overflow-hidden">
+            <div class="bg-surface-container px-4 py-3 flex items-center gap-2 border-b border-outline-variant">
+                <span class="material-symbols-outlined text-[18px] text-secondary" style="font-variation-settings:'FILL' 1,'wght' 400">auto_awesome</span>
+                <span class="font-label-md text-label-md">AI 공시 요약</span>
+                <span class="ml-auto font-caption text-caption text-outline">최근 90일</span>
+            </div>
+            <div id="disclosure-content" class="px-4 py-4 bg-white min-h-[80px]">
+                <div class="flex items-center gap-2 text-on-surface-variant">
+                    <div class="spinner-sm"></div>
+                    <span class="font-caption text-caption ml-1">공시 분석 중...</span>
+                </div>
+            </div>
+        </aside>
+
+        <section id="result-section" class="flex-1 min-w-0 space-y-10">
 
             <!-- 1. 종목명 + 현재가 -->
             <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-8 border-b border-outline-variant">
@@ -288,6 +309,8 @@
             </div>
 
         </section>
+        </div><!-- flex row -->
+        </div><!-- result-wrapper -->
     </main>
 
     <footer class="border-t border-outline-variant mt-16">
@@ -300,7 +323,7 @@
     <script>
         function quickSearch(t) { document.getElementById('ticker-input').value = t; startResearch(); }
         function resetSearch() {
-            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('result-wrapper').style.display = 'none';
             document.getElementById('error-section').style.display = 'none';
             document.getElementById('ticker-input').value = '';
             document.getElementById('ticker-input').focus();
@@ -338,13 +361,13 @@
         }
 
         function showLoading() {
-            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('result-wrapper').style.display = 'none';
             document.getElementById('error-section').style.display = 'none';
             document.getElementById('loading-section').style.display = 'flex';
         }
         function showError(msg) {
             document.getElementById('loading-section').style.display = 'none';
-            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('result-wrapper').style.display = 'none';
             document.getElementById('error-message').textContent = msg;
             document.getElementById('error-section').style.display = 'block';
         }
@@ -417,8 +440,52 @@
                 </tr>`;
             });
 
-            document.getElementById('result-section').style.display = 'block';
-            document.getElementById('result-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById('result-wrapper').style.display = 'block';
+            document.getElementById('result-wrapper').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            loadDisclosures(d.ticker);
+        }
+
+        function loadDisclosures(ticker) {
+            const sidebar  = document.getElementById('disclosure-sidebar');
+            const content  = document.getElementById('disclosure-content');
+            const isKorean = /^\d{6}$/.test(ticker);
+
+            if (!isKorean) { sidebar.classList.add('hidden'); return; }
+
+            sidebar.classList.remove('hidden');
+            content.innerHTML = `<div class="flex items-center gap-2 text-on-surface-variant py-1">
+                <div class="spinner-sm"></div>
+                <span class="font-caption text-caption ml-1">공시 분석 중...</span>
+            </div>`;
+
+            fetch(`${API_BASE}/api/disclosures/${ticker}`)
+                .then(r => r.json())
+                .then(data => {
+                    let html = '';
+                    if (data.summary) {
+                        html += `<p class="font-body-md text-body-md text-on-surface leading-relaxed mb-3" style="font-size:13px;line-height:1.6">${data.summary}</p>`;
+                    }
+                    if (data.items && data.items.length) {
+                        html += `<div class="${data.summary ? 'border-t border-outline-variant pt-3' : ''} space-y-0">`;
+                        data.items.forEach(item => {
+                            html += `<div class="disc-item">
+                                <span class="font-caption text-caption text-outline">${item.date}</span>
+                                <p class="font-label-md text-label-md text-on-surface mt-0.5" style="font-size:12px;line-height:1.4">${item.title}</p>
+                            </div>`;
+                        });
+                        html += `</div>`;
+                        html += `<a href="https://dart.fss.or.kr/dsab001/main.do" target="_blank"
+                            class="mt-3 flex items-center gap-1 font-caption text-caption text-secondary hover:underline" style="font-size:12px">
+                            <span class="material-symbols-outlined" style="font-size:13px">open_in_new</span>DART 전체 공시 보기
+                        </a>`;
+                    } else if (!data.summary) {
+                        html = `<p class="font-caption text-caption text-outline">최근 공시가 없습니다.</p>`;
+                    }
+                    content.innerHTML = html;
+                })
+                .catch(() => {
+                    content.innerHTML = `<p class="font-caption text-caption text-outline">공시 데이터를 불러올 수 없습니다.</p>`;
+                });
         }
 
         function saveToSheets() { alert('백엔드 연결 후 구글 시트에 자동 저장됩니다.\n/services/sheetsService.js 구현 필요'); }

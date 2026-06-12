@@ -9,3 +9,4 @@ httpx
 requests
 beautifulsoup4
 lxml
+anthropic

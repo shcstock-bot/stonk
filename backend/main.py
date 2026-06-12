@@ -54,6 +54,14 @@ async def get_stock(ticker: str):
     return data
 
 
+@app.get("/api/disclosures/{ticker}")
+async def get_disclosures(ticker: str):
+    if not KR_TICKER_PATTERN.match(ticker):
+        return {"items": [], "summary": "한국 종목(6자리 코드)만 지원합니다."}
+    from services.disclosures import get_disclosure_summary
+    return get_disclosure_summary(ticker)
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
