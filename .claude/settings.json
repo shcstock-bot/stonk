@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "$port = netstat -an | Select-String '0.0.0.0:8000\\s+LISTENING'; if (-not $port) { Start-Process powershell -ArgumentList '-NoProfile -NonInteractive -Command \"$env:PATH = [System.Environment]::GetEnvironmentVariable(''PATH'',''Machine'') + '';'' + [System.Environment]::GetEnvironmentVariable(''PATH'',''User''); Set-Location C:\\VIBE\\stock\\backend; python main.py\"' -WindowStyle Minimized }",
+            "async": true,
+            "statusMessage": "백엔드 서버 시작 중..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "$json = $input | ConvertFrom-Json; $f = $json.tool_input.file_path; if ($f -like '*main3.html') { Copy-Item 'C:\\VIBE\\stock\\main3.html' 'C:\\VIBE\\stock\\public\\index.html' -Force; Set-Location 'C:\\VIBE\\stock'; firebase deploy --only hosting }",
+            "timeout": 60,
+            "statusMessage": "Deploying to Firebase...",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}

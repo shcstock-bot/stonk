@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>CheckStonk | 종목 리서치 자동화</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=Hanken+Grotesk:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-container-lowest": "#ffffff",
+                        "surface-variant": "#e3e2e2",
+                        "on-background": "#1b1c1c",
+                        "outline": "#747878",
+                        "on-primary": "#ffffff",
+                        "on-secondary-container": "#117254",
+                        "secondary-fixed-dim": "#82d7b2",
+                        "surface-container-high": "#e9e8e7",
+                        "inverse-on-surface": "#f2f0f0",
+                        "primary": "#000000",
+                        "surface-dim": "#dbdad9",
+                        "surface-bright": "#fbf9f9",
+                        "on-error": "#ffffff",
+                        "surface-container-low": "#f5f3f3",
+                        "secondary": "#026c4e",
+                        "on-error-container": "#93000a",
+                        "inverse-surface": "#303031",
+                        "surface": "#fbf9f9",
+                        "surface-container": "#efeded",
+                        "outline-variant": "#c4c7c7",
+                        "on-surface-variant": "#444748",
+                        "error-container": "#ffdad6",
+                        "primary-container": "#1c1b1b",
+                        "on-primary-container": "#858383",
+                        "on-secondary": "#ffffff",
+                        "secondary-container": "#9ef4cd",
+                        "on-surface": "#1b1c1c",
+                        "error": "#ba1a1a",
+                        "background": "#fbf9f9",
+                        "surface-container-highest": "#e3e2e2"
+                    },
+                    fontFamily: {
+                        "caption": ["Hanken Grotesk"],
+                        "headline-lg": ["Newsreader"],
+                        "headline-md": ["Newsreader"],
+                        "body-lg": ["Hanken Grotesk"],
+                        "body-md": ["Hanken Grotesk"],
+                        "display-lg": ["Newsreader"],
+                        "label-md": ["Hanken Grotesk"]
+                    },
+                    fontSize: {
+                        "caption": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-lg": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600" }]
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body { background-color: #fbf9f9; color: #1b1c1c; -webkit-font-smoothing: antialiased; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+        .hero-gradient { background: radial-gradient(circle at 50% 50%, rgba(2,108,78,0.03) 0%, rgba(251,249,249,0) 70%); }
+        .spinner { border: 3px solid #e3e2e2; border-top: 3px solid #026c4e; border-radius: 50%; width: 32px; height: 32px; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #result-section { display: none; }
+        #error-section { display: none; }
+        #loading-section { display: none; }
+        .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #444748; margin-bottom: 12px; }
+        .metric-card { background: #fff; border: 1px solid #c4c7c7; border-radius: 2px; padding: 18px 20px; }
+        .metric-card .label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: #747878; margin-bottom: 6px; }
+        .metric-card .value { font-family: 'Newsreader', serif; font-size: 22px; font-weight: 500; color: #000; line-height: 1.2; }
+        .metric-card .sub { font-size: 12px; color: #444748; margin-top: 3px; }
+        .pos { color: #026c4e !important; }
+        .neg { color: #ba1a1a !important; }
+    </style>
+</head>
+
+<body class="font-body-md text-body-md overflow-x-hidden">
+
+    <!-- 네비게이션 -->
+    <nav class="bg-surface sticky top-0 z-50 border-b border-outline-variant">
+        <div class="max-w-5xl mx-auto px-8 flex justify-between items-center h-16">
+            <span class="font-headline-md text-headline-md font-bold tracking-tight">CheckStonk</span>
+            <span class="font-label-md text-label-md text-on-surface-variant">종목 리서치 자동화</span>
+        </div>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-8 py-12">
+
+        <!-- 검색 영역 -->
+        <section class="hero-gradient pb-12 border-b border-outline-variant">
+            <h1 class="font-display-lg text-display-lg text-primary mb-3 tracking-tight">종목 리서치를 자동화하세요</h1>
+            <p class="font-body-lg text-body-lg text-on-surface-variant mb-8 max-w-xl">티커를 입력하면 현재가, 재무지표, 3년치 손익을 즉시 분석합니다.</p>
+            <div class="max-w-xl">
+                <div class="flex items-center border-b-2 border-outline-variant focus-within:border-primary transition-colors py-3 group">
+                    <span class="material-symbols-outlined text-outline group-focus-within:text-primary mr-3">search</span>
+                    <input id="ticker-input" class="w-full bg-transparent border-none focus:ring-0 font-body-lg text-body-lg placeholder:text-outline p-0" placeholder="티커 입력 (예: 005930, AAPL)" type="text" />
+                    <button id="search-btn" onclick="startResearch()" class="ml-4 bg-primary text-on-primary px-6 py-2.5 font-label-md text-label-md rounded-sm hover:opacity-90 whitespace-nowrap active:scale-95 transition-all">리서치 시작</button>
+                </div>
+                <div class="mt-3 flex gap-3 text-outline font-label-md text-label-md flex-wrap">
+                    <span>바로 조회:</span>
+                    <button onclick="quickSearch('005930')" class="hover:text-primary transition-colors underline underline-offset-4">삼성전자</button>
+                    <button onclick="quickSearch('000660')" class="hover:text-primary transition-colors underline underline-offset-4">SK하이닉스</button>
+                    <button onclick="quickSearch('AAPL')" class="hover:text-primary transition-colors underline underline-offset-4">Apple</button>
+                    <button onclick="quickSearch('NVDA')" class="hover:text-primary transition-colors underline underline-offset-4">NVIDIA</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 로딩 -->
+        <section id="loading-section" class="py-16 flex flex-col items-center gap-4">
+            <div class="spinner"></div>
+            <p class="font-label-md text-label-md text-on-surface-variant">데이터를 불러오는 중...</p>
+        </section>
+
+        <!-- 에러 -->
+        <section id="error-section" class="py-10">
+            <div class="border border-error/30 bg-error-container rounded p-5 flex items-start gap-3">
+                <span class="material-symbols-outlined text-error">error</span>
+                <div>
+                    <p class="font-label-md text-label-md text-error mb-1">조회 실패</p>
+                    <p id="error-message" class="font-body-md text-body-md text-on-surface-variant"></p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== 결과 영역 ===== -->
+        <section id="result-section" class="pt-10 space-y-10">
+
+            <!-- 1. 종목명 + 현재가 -->
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-8 border-b border-outline-variant">
+                <div>
+                    <p id="result-ticker" class="font-label-md text-label-md text-on-surface-variant mb-1"></p>
+                    <h2 id="result-name" class="font-headline-lg text-headline-lg text-primary"></h2>
+                    <p id="result-sector" class="font-body-md text-body-md text-on-surface-variant mt-1"></p>
+                </div>
+                <div class="text-right">
+                    <p id="result-price" class="font-display-lg text-display-lg text-primary leading-none"></p>
+                    <p id="result-change" class="font-label-md text-label-md mt-1"></p>
+                    <p id="result-asof" class="font-caption text-caption text-on-surface-variant mt-1"></p>
+                </div>
+            </div>
+
+            <!-- 2. 밸류에이션 지표 (기존) -->
+            <div>
+                <p class="section-label">밸류에이션</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="metric-card">
+                        <div class="label">PER</div>
+                        <div id="r-per" class="value"></div>
+                        <div class="sub">주가수익비율</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="label">PBR</div>
+                        <div id="r-pbr" class="value"></div>
+                        <div class="sub">주가순자산비율</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="label">EPS</div>
+                        <div id="r-eps" class="value"></div>
+                        <div class="sub">주당순이익</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="label">시가총액</div>
+                        <div id="r-mktcap" class="value"></div>
+                        <div class="sub">Market Cap</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 수익성 + 재무안정성 (신규) -->
+            <div>
+                <p class="section-label">수익성 &amp; 재무안정성</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="metric-card">
+                        <div class="label">ROE</div>
+                        <div id="r-roe" class="value"></div>
+                        <div class="sub">자기자본이익률</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="label">부채비율</div>
+                        <div id="r-debt" class="value"></div>
+                        <div class="sub">총부채 / 자기자본</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="label">EV/EBITDA</div>
+                        <div id="r-evebitda" class="value"></div>
+                        <div class="sub">기업가치 배수</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="label">배당수익률</div>
+                        <div id="r-div" class="value"></div>
+                        <div class="sub">연간 배당 / 주가</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 시장 데이터 (신규) -->
+            <div>
+                <p class="section-label">시장 데이터</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="metric-card">
+                        <div class="label">베타 (β)</div>
+                        <div id="r-beta" class="value"></div>
+                        <div class="sub">시장 대비 변동성</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="label">외국인 보유</div>
+                        <div id="r-foreign" class="value"></div>
+                        <div class="sub">외국인 보유 비율</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="label">거래량</div>
+                        <div id="r-vol" class="value"></div>
+                        <div class="sub">당일 거래량</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="label">평균 거래량</div>
+                        <div id="r-avgvol" class="value"></div>
+                        <div class="sub">20일 평균</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. 52주 범위 -->
+            <div>
+                <p class="section-label">52주 범위</p>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="metric-card" style="background:#f5f3f3;">
+                        <div class="label">52주 최고</div>
+                        <div id="r-52high" class="value pos"></div>
+                    </div>
+                    <div class="metric-card" style="background:#f5f3f3;">
+                        <div class="label">52주 최저</div>
+                        <div id="r-52low" class="value"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. 3년 손익 테이블 (YoY 성장률 컬럼 추가) -->
+            <div>
+                <p class="section-label">최근 3년 손익 &amp; YoY 성장률</p>
+                <div class="border border-outline-variant rounded overflow-x-auto">
+                    <table class="w-full text-left min-w-[640px]">
+                        <thead class="bg-surface-container">
+                            <tr>
+                                <th class="font-label-md text-label-md text-on-surface-variant px-5 py-3">연도</th>
+                                <th class="font-label-md text-label-md text-on-surface-variant px-5 py-3">매출액</th>
+                                <th class="font-label-md text-label-md text-on-surface-variant px-5 py-3">매출 YoY</th>
+                                <th class="font-label-md text-label-md text-on-surface-variant px-5 py-3">영업이익</th>
+                                <th class="font-label-md text-label-md text-on-surface-variant px-5 py-3">영업이익 YoY</th>
+                                <th class="font-label-md text-label-md text-on-surface-variant px-5 py-3">순이익</th>
+                            </tr>
+                        </thead>
+                        <tbody id="result-income-table" class="divide-y divide-outline-variant bg-white"></tbody>
+                    </table>
+                </div>
+                <p class="font-caption text-caption text-on-surface-variant mt-2">* 단위: 백만 USD (해외) / 억 원 (국내). 국내: DART 공식 재무제표 · 해외: yfinance</p>
+            </div>
+
+            <!-- 7. 액션 버튼 -->
+            <div class="flex flex-col md:flex-row gap-3 pt-4 border-t border-outline-variant">
+                <button onclick="saveToSheets()" class="flex items-center gap-2 border border-outline-variant px-5 py-3 font-label-md text-label-md rounded hover:bg-surface-container transition-colors">
+                    <span class="material-symbols-outlined text-[20px]">table_chart</span>구글 시트에 저장
+                </button>
+                <button onclick="sendKakao()" class="flex items-center gap-2 bg-[#FEE500] text-[#191919] px-5 py-3 font-label-md text-label-md rounded hover:opacity-90 transition-colors">
+                    <span class="font-bold text-sm">K</span>카카오로 알림 전송
+                </button>
+                <button onclick="resetSearch()" class="ml-auto flex items-center gap-2 text-on-surface-variant px-5 py-3 font-label-md text-label-md hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined text-[20px]">refresh</span>다시 검색
+                </button>
+            </div>
+
+        </section>
+    </main>
+
+    <footer class="border-t border-outline-variant mt-16">
+        <div class="max-w-5xl mx-auto px-8 py-6 flex justify-between items-center">
+            <p class="font-caption text-caption text-on-surface-variant">© 2026 CheckStonk. 실제 투자 결정 전 전문가 상담을 권장합니다.</p>
+            <p class="font-caption text-caption text-on-surface-variant">데이터: pykrx · 네이버금융 · DART · yfinance</p>
+        </div>
+    </footer>
+
+    <script>
+        function quickSearch(t) { document.getElementById('ticker-input').value = t; startResearch(); }
+        function resetSearch() {
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('error-section').style.display = 'none';
+            document.getElementById('ticker-input').value = '';
+            document.getElementById('ticker-input').focus();
+        }
+
+        const API_BASE = 'http://localhost:8000';
+
+        async function startResearch() {
+            const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
+            if (!ticker) { showError('티커를 입력해주세요.'); return; }
+            showLoading();
+            try {
+                const res = await fetch(`${API_BASE}/api/stock/${ticker}`);
+                const data = await res.json();
+                if (!res.ok) {
+                    showError(data.error || `"${ticker}" 종목 데이터를 찾을 수 없습니다.`);
+                } else {
+                    showResult(data);
+                }
+            } catch (e) {
+                showError('백엔드 서버에 연결할 수 없습니다. backend/main.py가 실행 중인지 확인해주세요.');
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('error-section').style.display = 'none';
+            document.getElementById('loading-section').style.display = 'flex';
+        }
+        function showError(msg) {
+            document.getElementById('loading-section').style.display = 'none';
+            document.getElementById('result-section').style.display = 'none';
+            document.getElementById('error-message').textContent = msg;
+            document.getElementById('error-section').style.display = 'block';
+        }
+
+        function fmt(n) { return Number(n).toLocaleString(); }
+
+        function yoy(curr, prev) {
+            if (!prev || prev === 0) return '—';
+            const pct = ((curr - prev) / Math.abs(prev)) * 100;
+            const sign = pct >= 0 ? '+' : '';
+            return sign + pct.toFixed(1) + '%';
+        }
+
+        function showResult(d) {
+            document.getElementById('loading-section').style.display = 'none';
+            document.getElementById('error-section').style.display = 'none';
+
+            document.getElementById('result-ticker').textContent = d.ticker;
+            document.getElementById('result-name').textContent = d.name;
+            document.getElementById('result-sector').textContent = d.sector;
+            document.getElementById('result-price').textContent = d.price;
+            document.getElementById('result-asof').textContent = d.asof;
+
+            const chEl = document.getElementById('result-change');
+            chEl.textContent = d.change;
+            chEl.className = 'font-label-md text-label-md mt-1 ' + (d.pos ? 'pos' : 'neg');
+
+            // 밸류에이션
+            document.getElementById('r-per').textContent = d.per;
+            document.getElementById('r-pbr').textContent = d.pbr;
+            document.getElementById('r-eps').textContent = d.eps;
+            document.getElementById('r-mktcap').textContent = d.mktcap;
+
+            // 수익성 & 재무안정성
+            document.getElementById('r-roe').textContent = d.roe;
+            document.getElementById('r-debt').textContent = d.debt;
+            document.getElementById('r-evebitda').textContent = d.evebitda;
+            document.getElementById('r-div').textContent = d.div;
+
+            // 시장 데이터
+            document.getElementById('r-beta').textContent = d.beta;
+            document.getElementById('r-foreign').textContent = d.foreign;
+            document.getElementById('r-vol').textContent = fmt(d.vol);
+            document.getElementById('r-avgvol').textContent = fmt(d.avgvol);
+
+            // 52주
+            document.getElementById('r-52high').textContent = d.high52;
+            document.getElementById('r-52low').textContent = d.low52;
+
+            // 손익 테이블 + YoY
+            const tbody = document.getElementById('result-income-table');
+            tbody.innerHTML = '';
+            d.income.forEach((row, i) => {
+                const prev = i > 0 ? d.income[i-1] : null;
+                const revYoy = prev ? yoy(row.rev, prev.rev) : '—';
+                const opYoy  = prev ? yoy(row.op,  prev.op)  : '—';
+                const opNeg  = row.op < 0;
+                const netNeg = row.net < 0;
+                const revYoyPos = prev && row.rev >= prev.rev;
+                const opYoyPos  = prev && row.op  >= prev.op;
+
+                tbody.innerHTML += `
+                <tr class="hover:bg-surface-container-low transition-colors">
+                    <td class="px-5 py-4 font-label-md text-label-md font-semibold">${row.year}</td>
+                    <td class="px-5 py-4 font-body-md text-body-md">${fmt(row.rev)}</td>
+                    <td class="px-5 py-4 font-label-md text-label-md ${revYoyPos ? 'pos' : (revYoy === '—' ? '' : 'neg')}">${revYoy}</td>
+                    <td class="px-5 py-4 font-body-md text-body-md ${opNeg ? 'neg' : 'pos'}">${fmt(row.op)}</td>
+                    <td class="px-5 py-4 font-label-md text-label-md ${opYoyPos ? 'pos' : (opYoy === '—' ? '' : 'neg')}">${opYoy}</td>
+                    <td class="px-5 py-4 font-body-md text-body-md ${netNeg ? 'neg' : ''}">${fmt(row.net)}</td>
+                </tr>`;
+            });
+
+            document.getElementById('result-section').style.display = 'block';
+            document.getElementById('result-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function saveToSheets() { alert('백엔드 연결 후 구글 시트에 자동 저장됩니다.\n/services/sheetsService.js 구현 필요'); }
+        function sendKakao()    { alert('백엔드 연결 후 카카오로 알림이 전송됩니다.\n/services/kakaoService.js 구현 필요'); }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('ticker-input').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') startResearch();
+            });
+        });
+    </script>
+</body>
+</html>

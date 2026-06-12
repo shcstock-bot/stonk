@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+backend/docs_cache/
+
+# 환경변수 (절대 업로드 금지)
+backend/.env
+*.env
+key.env
+
+# Node
+node_modules/
+.firebase/
+
+# Firebase
+.firebaserc
+
+# Claude
+.claude/settings.local.json
