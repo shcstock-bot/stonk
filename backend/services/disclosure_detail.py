@@ -48,10 +48,9 @@ def get_disclosure_detail_summary(rcept_no: str, title: str = "", date: str = ""
     content_text = _fetch_dart_text(rcept_no)
 
     try:
-        import google.generativeai as genai
+        from google import genai as _genai
 
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        client = _genai.Client(api_key=GEMINI_API_KEY)
 
         if content_text:
             prompt = (
@@ -67,9 +66,9 @@ def get_disclosure_detail_summary(rcept_no: str, title: str = "", date: str = ""
                 "각 줄은 '•' 으로 시작하고 줄바꿈으로 구분하세요. 서두 없이 바로 시작하세요."
             )
 
-        summary = model.generate_content(prompt).text.strip()
-    except Exception:
-        summary = "요약을 생성할 수 없습니다."
+        summary = client.models.generate_content(model="gemini-1.5-flash", contents=prompt).text.strip()
+    except Exception as e:
+        summary = f"오류: {type(e).__name__}: {str(e)[:120]}"
 
     result = {"summary": summary}
     _cache[rcept_no] = {"data": result, "ts": time.time()}

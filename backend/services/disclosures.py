@@ -59,9 +59,8 @@ def get_disclosure_summary(ticker: str) -> dict:
     summary = ""
     if GEMINI_API_KEY and items:
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=GEMINI_API_KEY)
-            model = genai.GenerativeModel("gemini-1.5-flash")
+            from google import genai as _genai
+            client = _genai.Client(api_key=GEMINI_API_KEY)
             titles = "\n".join(f"- {i['date']}: {i['title']}" for i in items)
             prompt = (
                 f"다음은 {ticker} 종목의 최근 공시 목록입니다. "
@@ -69,10 +68,10 @@ def get_disclosure_summary(ticker: str) -> dict:
                 "불필요한 서두 없이 핵심만 작성하세요.\n\n"
                 f"{titles}"
             )
-            resp = model.generate_content(prompt)
+            resp = client.models.generate_content(model="gemini-1.5-flash", contents=prompt)
             summary = resp.text
-        except Exception:
-            summary = ""
+        except Exception as e:
+            summary = f"[오류: {type(e).__name__}: {str(e)[:80]}]"
 
     result = {"items": items, "summary": summary, "corp_code": corp_code}
     _cache[ticker] = {"data": result, "ts": now}
