@@ -135,8 +135,8 @@
 
         <!-- 검색 영역 -->
         <section class="hero-gradient pb-12 border-b border-outline-variant">
-            <h1 class="font-display-lg text-display-lg text-primary mb-3 tracking-tight" style="margin-left:-5px">원클릭 주식 리서치</h1>
-            <p class="font-body-lg text-body-lg text-on-surface-variant mb-8 max-w-xl">종목명 또는 티커 입력으로 재무·공시를 즉시 확인하세요.</p>
+            <h1 id="hero-headline" class="font-display-lg text-display-lg text-primary mb-3 tracking-tight" style="margin-left:-5px">원클릭 주식 리서치</h1>
+            <p id="hero-desc" class="font-body-lg text-body-lg text-on-surface-variant mb-8 max-w-xl">종목명 또는 티커 입력으로 재무·공시를 즉시 확인하세요.</p>
             <div class="max-w-xl">
                 <div class="relative">
                     <div class="flex items-center border-b-2 border-outline-variant focus-within:border-primary transition-colors py-3 group">
@@ -360,6 +360,8 @@
         function resetSearch() {
             document.getElementById('result-wrapper').style.display = 'none';
             document.getElementById('error-section').style.display = 'none';
+            document.getElementById('hero-headline').style.display = '';
+            document.getElementById('hero-desc').style.display = '';
             document.getElementById('ticker-input').value = '';
             document.getElementById('ticker-input').focus();
         }
@@ -421,6 +423,9 @@
         function showResult(d) {
             document.getElementById('loading-section').style.display = 'none';
             document.getElementById('error-section').style.display = 'none';
+            document.getElementById('hero-headline').style.display = 'none';
+            document.getElementById('hero-desc').style.display = 'none';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
 
             document.getElementById('result-ticker').textContent = d.ticker;
             document.getElementById('result-name').textContent = d.name;
@@ -482,7 +487,6 @@
             });
 
             document.getElementById('result-wrapper').style.display = 'block';
-            document.getElementById('result-wrapper').scrollIntoView({ behavior: 'smooth', block: 'start' });
             loadDisclosures(d.ticker);
         }
 

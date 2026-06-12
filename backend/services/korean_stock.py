@@ -1,4 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+KST = timezone(timedelta(hours=9))
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 import time
@@ -225,8 +227,11 @@ def get_korean_stock(ticker: str) -> dict:
             ok = re.search(r"(\d+)억", s)
             jo_val = int(jo.group(1)) if jo else 0
             ok_val = int(ok.group(1)) if ok else 0
-            total = jo_val + ok_val / 10000
-            return f"{total:.1f}조"
+            if jo_val >= 1:
+                total = jo_val + ok_val / 10000
+                return f"{total:.1f}조"
+            else:
+                return f"{ok_val:,}억"
         except Exception:
             return raw
 
@@ -263,7 +268,7 @@ def get_korean_stock(ticker: str) -> dict:
     except Exception:
         pass
 
-    _now = datetime.now()
+    _now = datetime.now(KST)
     _hour = _now.strftime("%I").lstrip("0") or "12"
     asof = _now.strftime(f"%Y.%m.%d {_hour}:%M") + _now.strftime("%p").upper() + " 기준"
 
