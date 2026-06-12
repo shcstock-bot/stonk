@@ -68,11 +68,13 @@ def get_us_stock(ticker: str) -> dict:
     evebitda_raw = _safe(info.get("enterpriseToEbitda"))
     evebitda = f"{evebitda_raw:.1f}x" if evebitda_raw != "N/A" else "N/A"
 
-    # 배당수익률
-    # 배당수익률: dividendRate / price 로 직접 계산 (dividendYield 필드는 부정확)
-    div_rate = _safe(info.get("dividendRate"))
-    if div_rate != "N/A" and price != "N/A" and price > 0:
+    # 배당수익률: dividendRate/price 우선, 없으면 dividendYield(소수) fallback
+    div_rate  = _safe(info.get("dividendRate"))
+    div_yield = _safe(info.get("dividendYield"))
+    if div_rate not in ("N/A", None) and div_rate and price not in ("N/A", None) and price > 0:
         div = f"{(div_rate / price) * 100:.2f}%"
+    elif div_yield not in ("N/A", None) and div_yield:
+        div = f"{div_yield * 100:.2f}%"
     else:
         div = "N/A"
 
@@ -142,7 +144,7 @@ def get_us_stock(ticker: str) -> dict:
         "evebitda": evebitda,
         "div": div,
         "beta": beta,
-        "foreign": "N/A",
+        "foreign": (lambda v: f"{v*100:.1f}%" if v not in ("N/A", None) else "N/A")(_safe(info.get("heldPercentInstitutions"))),
         "vol": vol,
         "avgvol": avgvol,
         "high52": high52,

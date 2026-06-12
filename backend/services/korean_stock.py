@@ -218,7 +218,19 @@ def get_korean_stock(ticker: str) -> dict:
     pbr    = gi("pbr").replace("배", "x")
     eps    = gi("eps")
     div    = gi("dividendYieldRatio")
-    mktcap = gi("marketValue")
+    def _fmt_mktcap(raw: str) -> str:
+        try:
+            s = raw.replace(",", "")
+            jo = re.search(r"(\d+)조", s)
+            ok = re.search(r"(\d+)억", s)
+            jo_val = int(jo.group(1)) if jo else 0
+            ok_val = int(ok.group(1)) if ok else 0
+            total = jo_val + ok_val / 10000
+            return f"{total:.1f}조"
+        except Exception:
+            return raw
+
+    mktcap = _fmt_mktcap(gi("marketValue"))
     foreign = gi("foreignRate")
 
     h52 = gi("highPriceOf52Weeks").replace(",", "")
@@ -233,11 +245,8 @@ def get_korean_stock(ticker: str) -> dict:
             return f"{v / 100_000_000:.1f}억원"
         return f"{v:,}원"
 
-    # 거래대금 (당일)
-    tv_raw = gi("accumulatedTradingValue").replace(",", "")
-    vol = _fmt_won(int(tv_raw) * 1_000_000) if tv_raw.isdigit() else "N/A"
-
-    # 평균 거래대금: dealTrendInfos 기준 price × volume 평균
+    # 거래대금: dealTrendInfos 에서 price × volume 계산
+    vol = "N/A"
     avgvol = "N/A"
     try:
         trends = integ.get("dealTrendInfos", [])
@@ -249,11 +258,14 @@ def get_korean_stock(ticker: str) -> dict:
                 if p.isdigit() and v.isdigit():
                     vals.append(int(p) * int(v))
             if vals:
-                avgvol = _fmt_won(sum(vals) // len(vals))
+                vol = _fmt_won(vals[0])              # 당일 (가장 최근)
+                avgvol = _fmt_won(sum(vals) // len(vals))  # 평균
     except Exception:
         pass
 
-    asof = datetime.now().strftime("%Y.%m.%d") + " 기준"
+    _now = datetime.now()
+    _hour = _now.strftime("%I").lstrip("0") or "12"
+    asof = _now.strftime(f"%Y.%m.%d {_hour}:%M") + _now.strftime("%p").upper() + " 기준"
 
     return {
         "ticker":   ticker,

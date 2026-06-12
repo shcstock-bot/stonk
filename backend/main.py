@@ -59,17 +59,21 @@ async def get_disclosure_detail(
     rcept_no: str,
     title: str = Query(default=""),
     date: str = Query(default=""),
+    cik: str = Query(default=""),
+    primary_doc: str = Query(default=""),
 ):
     from services.disclosure_detail import get_disclosure_detail_summary
-    return get_disclosure_detail_summary(rcept_no, title, date)
+    return get_disclosure_detail_summary(rcept_no, title, date, cik=cik, primary_doc=primary_doc)
 
 
 @app.get("/api/disclosures/{ticker}")
 async def get_disclosures(ticker: str):
-    if not KR_TICKER_PATTERN.match(ticker):
-        return {"items": [], "summary": "한국 종목(6자리 코드)만 지원합니다."}
-    from services.disclosures import get_disclosure_summary
-    return get_disclosure_summary(ticker)
+    if KR_TICKER_PATTERN.match(ticker):
+        from services.disclosures import get_disclosure_summary
+        return get_disclosure_summary(ticker)
+    else:
+        from services.us_disclosures import get_us_disclosure_summary
+        return get_us_disclosure_summary(ticker)
 
 
 @app.get("/health")

@@ -6,6 +6,36 @@ _cache = {"data": None, "ts": 0}
 _TTL = 6 * 3600
 _HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
+_EXCH_MAP = {
+    "NMS": "NASDAQ", "NGM": "NASDAQ", "NAS": "NASDAQ",
+    "NYQ": "NYSE",   "PCX": "NYSE",
+    "ASE": "AMEX",
+}
+
+
+def _yahoo_ac(query: str, limit: int = 10) -> list[dict]:
+    """Yahoo Finance autocomplete — 미국 상장 주식 검색"""
+    try:
+        r = requests.get(
+            "https://query1.finance.yahoo.com/v1/finance/search",
+            params={"q": query, "quotesCount": limit, "newsCount": 0, "enableFuzzyQuery": False},
+            headers={**_HEADERS, "Accept": "application/json"},
+            timeout=5,
+        )
+        results = []
+        for q in r.json().get("quotes", []):
+            if q.get("quoteType") not in ("EQUITY", "ETF"):
+                continue
+            symbol = q.get("symbol", "")
+            if "." in symbol:  # .KS .HK 등 비미국 제외
+                continue
+            name = q.get("longname") or q.get("shortname") or symbol
+            market = _EXCH_MAP.get(q.get("exchange", ""), q.get("exchange", "US"))
+            results.append({"code": symbol, "name": name, "market": market})
+        return results[:limit]
+    except Exception:
+        return []
+
 
 def _get_listing():
     now = time.time()
@@ -36,30 +66,41 @@ def _naver_ac(query: str, limit: int = 10) -> list[dict]:
         return []
 
 
+def _has_korean(text: str) -> bool:
+    return any("가" <= c <= "힣" or "ㄱ" <= c <= "ㆎ" for c in text)
+
+
 def search_stocks(query: str, limit: int = 10) -> list[dict]:
     if not query:
         return []
 
-    listing = _get_listing()
     q = query.strip()
     q_lower = q.lower()
-
     results = []
     codes_seen = set()
 
-    # 1차: 로컬 KRX 리스팅 (공식명 기준, 대소문자 무시)
-    for item in listing:
-        name = item.get("Name", "")
-        code = item.get("Code", "")
-        if q_lower in name.lower() or q_lower in code.lower():
-            results.append({"code": code, "name": name, "market": item.get("Market", "")})
-            codes_seen.add(code)
-        if len(results) >= limit:
-            break
+    if _has_korean(q) or q.isdigit():
+        # ── 국내 주식 검색 ──────────────────────────────
+        listing = _get_listing()
+        for item in listing:
+            name = item.get("Name", "")
+            code = item.get("Code", "")
+            if q_lower in name.lower() or q_lower in code.lower():
+                results.append({"code": code, "name": name, "market": item.get("Market", "")})
+                codes_seen.add(code)
+            if len(results) >= limit:
+                break
 
-    # 2차: 결과가 부족하면 네이버 AC fallback (일반명 처리)
-    if len(results) < limit:
-        for item in _naver_ac(q, limit):
+        if len(results) < limit:
+            for item in _naver_ac(q, limit):
+                if item["code"] not in codes_seen:
+                    results.append(item)
+                    codes_seen.add(item["code"])
+                if len(results) >= limit:
+                    break
+    else:
+        # ── 미국 주식 검색 (Yahoo Finance) ───────────────
+        for item in _yahoo_ac(q, limit):
             if item["code"] not in codes_seen:
                 results.append(item)
                 codes_seen.add(item["code"])
