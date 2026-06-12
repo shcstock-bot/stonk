@@ -81,27 +81,6 @@ def get_disclosure_summary(ticker: str) -> dict:
             "title": str(row.get("report_nm", "")),
         })
 
-    summary = ""
-    if GROQ_API_KEY and items:
-        try:
-            from groq import Groq
-            client = Groq(api_key=GROQ_API_KEY)
-            titles = "\n".join(f"- {i['date']}: {i['title']}" for i in items)
-            prompt = (
-                f"다음은 {ticker} 종목의 최근 공시 목록입니다. "
-                "투자자 관점에서 주요 내용을 2~3줄로 간결하게 요약해주세요. "
-                "불필요한 서두 없이 핵심만 작성하세요.\n\n"
-                f"{titles}"
-            )
-            resp = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[{"role": "user", "content": prompt}],
-            )
-            summary = resp.choices[0].message.content
-        except Exception as e:
-            msg = str(e)
-            summary = "AI 요약을 잠시 후 다시 시도해주세요. (API 한도)" if "429" in msg else f"[오류: {msg[:80]}]"
-
-    result = {"items": items, "summary": summary, "corp_code": corp_code}
+    result = {"items": items, "summary": "", "corp_code": corp_code}
     _cache[ticker] = {"data": result, "ts": now}
     return result

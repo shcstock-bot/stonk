@@ -52,16 +52,14 @@ def get_disclosure_detail_summary(rcept_no: str, title: str = "", date: str = ""
 
         if content_text:
             prompt = (
-                f"다음은 한국 상장기업의 DART 공시 문서입니다 ({date} · {title}).\n"
-                "투자자가 꼭 알아야 할 핵심을 정확히 3줄로 요약하세요. "
-                "각 줄은 '•' 으로 시작하고 줄바꿈으로 구분하세요. 서두 없이 바로 시작하세요.\n\n"
+                f"DART 공시 문서 ({date} · {title}) 핵심을 3줄로 요약하세요. "
+                "각 줄 '•'로 시작, 한 줄에 20자 이내, 서두 없이 바로.\n\n"
                 f"{content_text}"
             )
         else:
             prompt = (
-                f"한국 DART 공시 '{title}' ({date}) 가 투자자에게 의미하는 바를 "
-                "정확히 3줄로 설명하세요. "
-                "각 줄은 '•' 으로 시작하고 줄바꿈으로 구분하세요. 서두 없이 바로 시작하세요."
+                f"DART 공시 '{title}' ({date}) 의 투자자 관점 의미를 3줄로 설명하세요. "
+                "각 줄 '•'로 시작, 한 줄에 20자 이내, 서두 없이 바로."
             )
 
         client = Groq(api_key=GROQ_API_KEY)
