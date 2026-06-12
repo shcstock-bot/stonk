@@ -403,7 +403,7 @@
             document.getElementById('error-section').style.display = 'block';
         }
 
-        function fmt(n) { return Number(n).toLocaleString(); }
+        function fmt(n) { const v = Number(n); return isNaN(v) ? (n || "N/A") : v.toLocaleString(); }
 
         function yoy(curr, prev) {
             if (!prev || prev === 0) return '—';

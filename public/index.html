@@ -149,10 +149,10 @@
                 </div>
                 <div class="mt-3 flex gap-3 text-outline font-label-md text-label-md flex-wrap">
                     <span>바로 조회:</span>
-                    <button onclick="quickSearch('005930','삼성전자')" class="hover:text-primary transition-colors underline underline-offset-4">삼성전자</button>
-                    <button onclick="quickSearch('000660','SK하이닉스')" class="hover:text-primary transition-colors underline underline-offset-4">SK하이닉스</button>
-                    <button onclick="quickSearch('AAPL','Apple')" class="hover:text-primary transition-colors underline underline-offset-4">Apple</button>
-                    <button onclick="quickSearch('NVDA','NVIDIA')" class="hover:text-primary transition-colors underline underline-offset-4">NVIDIA</button>
+                    <button onclick="quickSearch('005930')" class="hover:text-primary transition-colors underline underline-offset-4">삼성전자</button>
+                    <button onclick="quickSearch('000660')" class="hover:text-primary transition-colors underline underline-offset-4">SK하이닉스</button>
+                    <button onclick="quickSearch('AAPL')" class="hover:text-primary transition-colors underline underline-offset-4">Apple</button>
+                    <button onclick="quickSearch('NVDA')" class="hover:text-primary transition-colors underline underline-offset-4">NVIDIA</button>
                 </div>
             </div>
         </section>
@@ -352,7 +352,7 @@
     </footer>
 
     <script>
-        function quickSearch(t, name) { document.getElementById('ticker-input').value = name ? name + '(' + t + ')' : t; startResearch(); }
+        function quickSearch(t) { document.getElementById('ticker-input').value = t; startResearch(); }
         function resetSearch() {
             document.getElementById('result-wrapper').style.display = 'none';
             document.getElementById('error-section').style.display = 'none';
@@ -403,7 +403,7 @@
             document.getElementById('error-section').style.display = 'block';
         }
 
-        function fmt(n) { return Number(n).toLocaleString(); }
+        function fmt(n) { const v = Number(n); return isNaN(v) ? (n || "N/A") : v.toLocaleString(); }
 
         function yoy(curr, prev) {
             if (!prev || prev === 0) return '—';
@@ -441,8 +441,8 @@
             // 시장 데이터
             document.getElementById('r-beta').textContent = d.beta;
             document.getElementById('r-foreign').textContent = d.foreign;
-            document.getElementById('r-vol').textContent = d.vol;
-            document.getElementById('r-avgvol').textContent = d.avgvol;
+            document.getElementById('r-vol').textContent = fmt(d.vol);
+            document.getElementById('r-avgvol').textContent = fmt(d.avgvol);
 
             // 52주
             document.getElementById('r-52high').textContent = d.high52;
