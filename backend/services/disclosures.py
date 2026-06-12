@@ -43,6 +43,7 @@ def get_disclosure_summary(ticker: str) -> dict:
 
     items = [
         {
+            "rcept_no": str(row.get("rcept_no", "")),
             "date": str(row.get("rcept_dt", ""))[:8],
             "title": str(row.get("report_nm", "")),
         }

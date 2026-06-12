@@ -54,6 +54,16 @@ async def get_stock(ticker: str):
     return data
 
 
+@app.get("/api/disclosure-detail/{rcept_no}")
+async def get_disclosure_detail(
+    rcept_no: str,
+    title: str = Query(default=""),
+    date: str = Query(default=""),
+):
+    from services.disclosure_detail import get_disclosure_detail_summary
+    return get_disclosure_detail_summary(rcept_no, title, date)
+
+
 @app.get("/api/disclosures/{ticker}")
 async def get_disclosures(ticker: str):
     if not KR_TICKER_PATTERN.match(ticker):
