@@ -88,13 +88,9 @@ def handle_update(update: dict):
     elif text.startswith("/remove") or text.startswith("/del"):
         parts = text.split(maxsplit=1)
         if len(parts) < 2:
-            send(chat_id, "사용법: /remove 005930")
+            send(chat_id, "사용법: /remove 삼성전자  또는  /remove 005930")
             return
-        ticker = parts[1].strip().upper()
-        if db.remove_from_watchlist(chat_id, ticker):
-            send(chat_id, f"✅ <b>{ticker}</b> 관심 종목에서 삭제했습니다.")
-        else:
-            send(chat_id, f"❌ <b>{ticker}</b> 은 등록된 종목이 아닙니다.")
+        _handle_remove(chat_id, parts[1].strip())
 
     # ── /list ────────────────────────────────────
     elif text.startswith("/list"):
@@ -140,7 +136,7 @@ def handle_update(update: dict):
             "📌 <b>전체 명령어</b>\n\n"
             "<b>종목 관리</b>\n"
             "/add [종목명 또는 티커]  — 관심 종목 추가\n"
-            "/remove [티커]  — 관심 종목 삭제\n"
+            "/remove [종목명 또는 티커]  — 관심 종목 삭제\n"
             "/list  — 관심 종목 전체 보기\n"
             "/report  — 즉시 현황 리포트\n\n"
             "<b>알림 설정</b>\n"
@@ -156,6 +152,26 @@ def handle_update(update: dict):
 
     else:
         send(chat_id, "명령어를 인식하지 못했습니다. /help 를 입력해보세요.")
+
+
+def _handle_remove(chat_id: int, query: str):
+    from services.search import search_stocks
+    import db
+
+    results = search_stocks(query, limit=1)
+    if results:
+        ticker = results[0]["code"]
+        name   = results[0]["name"]
+    else:
+        ticker = query.upper()
+        name   = ""
+
+    if db.remove_from_watchlist(chat_id, ticker):
+        label = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
+        send(chat_id, f"✅ {label} 관심 종목에서 삭제했습니다.")
+    else:
+        label = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
+        send(chat_id, f"❌ {label} 은 등록된 종목이 아닙니다.")
 
 
 def _handle_add(chat_id: int, query: str):
