@@ -45,6 +45,14 @@ def init_db():
                 PRIMARY KEY (chat_id, ticker, alert_date)
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_prefs (
+                chat_id          INTEGER PRIMARY KEY,
+                disclosure_alert INTEGER DEFAULT 1,
+                close_report     INTEGER DEFAULT 1,
+                price_alert      INTEGER DEFAULT 1
+            )
+        """)
         conn.commit()
 
 
@@ -148,3 +156,28 @@ def mark_price_alert_sent(chat_id: int, ticker: str, today: str):
             (chat_id, ticker, today),
         )
         conn.commit()
+
+
+# ── 유저 알림 설정 ────────────────────────────────
+def get_prefs(chat_id: int) -> dict:
+    with get_conn() as conn:
+        r = conn.execute("SELECT * FROM user_prefs WHERE chat_id=?", (chat_id,)).fetchone()
+        if r:
+            return dict(r)
+        return {"chat_id": chat_id, "disclosure_alert": 1, "close_report": 1, "price_alert": 1}
+
+
+def ensure_prefs(chat_id: int):
+    with get_conn() as conn:
+        conn.execute("INSERT OR IGNORE INTO user_prefs (chat_id) VALUES (?)", (chat_id,))
+        conn.commit()
+
+
+def toggle_pref(chat_id: int, key: str) -> bool:
+    ensure_prefs(chat_id)
+    with get_conn() as conn:
+        cur = conn.execute(f"SELECT {key} FROM user_prefs WHERE chat_id=?", (chat_id,)).fetchone()
+        new_val = 0 if cur[0] else 1
+        conn.execute(f"UPDATE user_prefs SET {key}=? WHERE chat_id=?", (new_val, chat_id))
+        conn.commit()
+        return bool(new_val)

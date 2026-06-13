@@ -78,7 +78,8 @@ def check_disclosures():
                     msg += f"\n\n<b>AI 요약</b>\n{summary}"
 
                 for chat_id in db.get_users_watching(ticker):
-                    send(chat_id, msg)
+                    if db.get_prefs(chat_id).get("disclosure_alert", 1):
+                        send(chat_id, msg)
 
                 db.mark_disclosure_sent(ticker, rcept_no)
         except Exception:
@@ -89,7 +90,8 @@ def check_disclosures():
 def send_market_close_report():
     import db
     for user in db.get_all_users():
-        send_report_to_user(user["chat_id"])
+        if db.get_prefs(user["chat_id"]).get("close_report", 1):
+            send_report_to_user(user["chat_id"])
 
 
 def send_report_to_user(chat_id: int):
@@ -138,6 +140,8 @@ def check_price_alerts():
         )
 
         for chat_id in db.get_users_watching(ticker):
+            if not db.get_prefs(chat_id).get("price_alert", 1):
+                continue
             if db.is_price_alert_sent(chat_id, ticker, today):
                 continue
             send(chat_id, msg)
