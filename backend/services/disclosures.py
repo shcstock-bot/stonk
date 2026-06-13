@@ -1,51 +1,64 @@
-import os
+import re
 import time
-from datetime import datetime, timedelta
 
 import requests
-
-DART_API_KEY = os.getenv("DART_API_KEY", "")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+from bs4 import BeautifulSoup
 
 _cache: dict = {}
 _TTL = 3600
 
-_HEADERS = {"User-Agent": "Mozilla/5.0"}
+_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Referer": "https://finance.naver.com/",
+}
 
 
-def _corp_code(ticker: str) -> str | None:
-    """ticker(6자리) → DART corp_code(8자리). 캐시된 dart 인스턴스 재사용."""
-    try:
-        from services.korean_stock import _get_dart_instance
-        _, codes = _get_dart_instance()
-        match = codes[codes["stock_code"] == ticker]
-        if match.empty:
-            return None
-        return str(match.iloc[0]["corp_code"]).zfill(8)
-    except Exception:
-        return None
-
-
-def _dart_list(corp_code: str, start: str, end: str) -> list[dict]:
-    """DART REST API로 공시 목록 직접 조회."""
+def _naver_disclosures(ticker: str) -> list[dict]:
+    """네이버 금융 공시 탭을 직접 파싱 — 사용자가 보는 목록과 동일."""
     try:
         r = requests.get(
-            "https://opendart.fss.or.kr/api/list.json",
-            params={
-                "crtfc_key": DART_API_KEY,
-                "corp_code": corp_code,
-                "bgn_de": start,
-                "end_de": end,
-                "page_no": 1,
-                "page_count": 10,
-            },
+            "https://finance.naver.com/item/news_notice.naver",
+            params={"code": ticker, "page": 1},
             headers=_HEADERS,
             timeout=10,
         )
-        data = r.json()
-        if data.get("status") != "000":
+        # 네이버 금융은 EUC-KR 인코딩
+        r.encoding = "euc-kr"
+        soup = BeautifulSoup(r.text, "lxml")
+
+        table = soup.find("table", class_="type2")
+        if not table:
             return []
-        return data.get("list", [])
+
+        items = []
+        for tr in table.find_all("tr"):
+            tds = tr.find_all("td")
+            if len(tds) < 2:
+                continue
+
+            a = tds[0].find("a")
+            if not a:
+                continue
+
+            title  = a.get_text(strip=True)
+            href   = a.get("href", "")
+
+            # href 예: /item/news_notice_detail.naver?code=005930&rcpNo=20250315001234&...
+            m = re.search(r"rcpNo=(\d+)", href)
+            rcept_no = m.group(1) if m else ""
+
+            # 접수일자는 마지막 td
+            date_raw = tds[-1].get_text(strip=True)
+            date = date_raw.split()[0] if date_raw else ""  # "2025.03.15 09:30" → "2025.03.15"
+
+            if not title or not rcept_no:
+                continue
+
+            items.append({"rcept_no": rcept_no, "date": date, "title": title})
+            if len(items) >= 8:
+                break
+
+        return items
     except Exception:
         return []
 
@@ -55,32 +68,7 @@ def get_disclosure_summary(ticker: str) -> dict:
     if ticker in _cache and now - _cache[ticker]["ts"] < _TTL:
         return _cache[ticker]["data"]
 
-    if not DART_API_KEY:
-        return {"items": [], "summary": "DART API 키가 설정되지 않았습니다."}
-
-    corp_code = _corp_code(ticker)
-    if not corp_code:
-        return {"items": [], "summary": "종목 정보를 찾을 수 없습니다.", "corp_code": ""}
-
-    end_dt = datetime.now()
-    start_dt = end_dt - timedelta(days=90)
-    raw = _dart_list(corp_code, start_dt.strftime("%Y%m%d"), end_dt.strftime("%Y%m%d"))
-
-    if not raw:
-        result = {"items": [], "summary": "최근 90일간 공시가 없습니다.", "corp_code": corp_code}
-        _cache[ticker] = {"data": result, "ts": now}
-        return result
-
-    items = []
-    for row in raw[:8]:
-        d = str(row.get("rcept_dt", ""))
-        date_fmt = f"{d[:4]}.{d[4:6]}.{d[6:]}" if len(d) == 8 else d
-        items.append({
-            "rcept_no": str(row.get("rcept_no", "")),
-            "date": date_fmt,
-            "title": str(row.get("report_nm", "")),
-        })
-
-    result = {"items": items, "summary": "", "corp_code": corp_code}
+    items  = _naver_disclosures(ticker)
+    result = {"items": items, "corp_code": ticker}
     _cache[ticker] = {"data": result, "ts": now}
     return result
