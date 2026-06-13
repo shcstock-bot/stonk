@@ -75,7 +75,7 @@ def get_disclosure_detail_summary(
         content_text = _fetch_sec_text(rcept_no, cik, primary_doc) if cik and primary_doc else ""
         guidelines = (
             "작성 규칙: "
-            "① 반드시 한국어로만 작성할 것 — 영어·한자 단어를 절대 그대로 두지 말고 모두 한국어로 번역 (예: virtually→온라인으로, Board→이사회, fiscal→회계, 董事→이사) "
+            "① 출력에 영문자(A~Z, a~z)를 단 한 글자도 포함하지 말 것 — 모든 단어를 한국어로 번역 (예: Board→이사회, general→총회, fiscal→회계연도, virtually→온라인, 董事→이사) "
             "② 회사명은 절대 언급하지 말 것 "
             "③ 각 줄은 '•'로 시작, 한 줄 20자 이내 "
             "④ 서두 없이 바로 핵심만"
@@ -94,7 +94,7 @@ def get_disclosure_detail_summary(
         content_text = _fetch_dart_text(rcept_no)
         guidelines = (
             "작성 규칙: "
-            "① 반드시 한국어로만 작성할 것 — 영어·한자 단어를 절대 그대로 두지 말고 모두 한국어로 번역 (예: 朴泰勳→박태훈, PARKTAEHOON→박태훈, 株主→주주) "
+            "① 출력에 영문자(A~Z, a~z)를 단 한 글자도 포함하지 말 것 — 모든 단어를 한국어로 번역 (예: 朴泰勳→박태훈, PARKTAEHOON→박태훈, 株主→주주) "
             "② 회사명은 절대 언급하지 말 것 "
             "③ 인명은 한글 이름만 사용 "
             "④ 각 줄은 '•'로 시작, 한 줄 20자 이내 "
