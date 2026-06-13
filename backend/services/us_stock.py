@@ -54,9 +54,9 @@ def get_us_stock(ticker: str) -> dict:
 
     # PER, PBR
     per_raw = _safe(info.get("trailingPE"))
-    per = f"{per_raw:.1f}x" if per_raw != "N/A" else "N/A"
+    per = f"{per_raw:.1f}" if per_raw != "N/A" else "N/A"
     pbr_raw = _safe(info.get("priceToBook"))
-    pbr = f"{pbr_raw:.1f}x" if pbr_raw != "N/A" else "N/A"
+    pbr = f"{pbr_raw:.1f}" if pbr_raw != "N/A" else "N/A"
 
     # ROE
     roe_raw = _safe(info.get("returnOnEquity"))
@@ -68,7 +68,7 @@ def get_us_stock(ticker: str) -> dict:
 
     # EV/EBITDA
     evebitda_raw = _safe(info.get("enterpriseToEbitda"))
-    evebitda = f"{evebitda_raw:.1f}x" if evebitda_raw != "N/A" else "N/A"
+    evebitda = f"{evebitda_raw:.1f}" if evebitda_raw != "N/A" else "N/A"
 
     # 배당수익률: dividendRate/price 우선, 없으면 dividendYield(소수) fallback
     div_rate  = _safe(info.get("dividendRate"))

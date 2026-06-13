@@ -38,7 +38,7 @@ def _get_yf_extra(ticker: str) -> dict:
                 ev   = info.get("enterpriseToEbitda")
                 beta = info.get("beta")
                 return {
-                    "evebitda": f"{ev:.1f}x"   if ev   else "N/A",
+                    "evebitda": f"{ev:.1f}"   if ev   else "N/A",
                     "beta":     f"{beta:.2f}"   if beta else "N/A",
                 }
         except Exception:
@@ -216,8 +216,8 @@ def get_korean_stock(ticker: str) -> dict:
     def gi(code):
         return info_map.get(code, "N/A")
 
-    per    = gi("per").replace("배", "x")
-    pbr    = gi("pbr").replace("배", "x")
+    per    = gi("per").replace("배", "")
+    pbr    = gi("pbr").replace("배", "")
     eps    = gi("eps")
     div    = gi("dividendYieldRatio")
     def _fmt_mktcap(raw: str) -> str:
