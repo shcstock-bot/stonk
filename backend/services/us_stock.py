@@ -123,10 +123,9 @@ def get_us_stock(ticker: str) -> dict:
     except Exception:
         pass
 
-    asof_ts = info.get("regularMarketTime")
-    _ref = datetime.fromtimestamp(asof_ts, KST) if asof_ts else datetime.now(KST)
-    _hour = _ref.strftime("%I").lstrip("0") or "12"
-    asof = _ref.strftime(f"%Y.%m.%d {_hour}:%M") + _ref.strftime("%p").upper() + " 기준"
+    _now = datetime.now(KST)
+    _hour = _now.strftime("%I").lstrip("0") or "12"
+    asof = _now.strftime(f"%Y.%m.%d {_hour}:%M") + _now.strftime("%p").upper() + " 기준"
 
     return {
         "ticker": ticker,

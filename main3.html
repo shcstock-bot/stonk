@@ -331,8 +331,9 @@
                 <button onclick="saveToSheets()" class="flex items-center gap-2 border border-outline-variant px-5 py-3 font-label-md text-label-md rounded hover:bg-surface-container transition-colors">
                     <span class="material-symbols-outlined text-[20px]">table_chart</span>구글 시트에 저장
                 </button>
-                <button onclick="sendKakao()" class="flex items-center gap-2 bg-[#FEE500] text-[#191919] px-5 py-3 font-label-md text-label-md rounded hover:opacity-90 transition-colors">
-                    <span class="font-bold text-sm">K</span>카카오로 알림 전송
+                <button onclick="openTelegramModal()" class="flex items-center gap-2 bg-[#229ED9] text-white px-5 py-3 font-label-md text-label-md rounded hover:opacity-90 transition-colors">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.289c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.088 13.37l-2.948-.924c-.64-.203-.654-.64.136-.948l11.521-4.44c.534-.194 1.001.13.765.19z"/></svg>
+                    텔레그램으로 알림 전송
                 </button>
                 <button onclick="resetSearch()" class="ml-auto flex items-center gap-2 text-on-surface-variant px-5 py-3 font-label-md text-label-md hover:text-primary transition-colors">
                     <span class="material-symbols-outlined text-[20px]">refresh</span>다시 검색
@@ -589,7 +590,13 @@
         }
 
         function saveToSheets() { alert('백엔드 연결 후 구글 시트에 자동 저장됩니다.\n/services/sheetsService.js 구현 필요'); }
-        function sendKakao()    { alert('백엔드 연결 후 카카오로 알림이 전송됩니다.\n/services/kakaoService.js 구현 필요'); }
+
+        function openTelegramModal() {
+            document.getElementById('tg-modal').classList.remove('hidden');
+        }
+        function closeTelegramModal() {
+            document.getElementById('tg-modal').classList.add('hidden');
+        }
 
         // 자동완성
         let acTimer = null;
@@ -681,7 +688,60 @@
             if (!input.contains(e.target) && !dropdown.contains(e.target)) hideDropdown();
         });
 
-        document.addEventListener('DOMContentLoaded', function() {});
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('tg-modal').addEventListener('click', function(e) {
+                if (e.target === this) closeTelegramModal();
+            });
+        });
     </script>
+
+    <!-- 텔레그램 알림 모달 -->
+    <div id="tg-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 relative">
+            <button onclick="closeTelegramModal()" class="absolute top-4 right-4 text-outline hover:text-on-surface">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+            <div class="flex items-center gap-2 mb-1">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#229ED9"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.289c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.088 13.37l-2.948-.924c-.64-.203-.654-.64.136-.948l11.521-4.44c.534-.194 1.001.13.765.19z"/></svg>
+                <span class="font-headline-md text-headline-md font-bold">텔레그램 알림 설정</span>
+            </div>
+            <p class="font-caption text-caption text-on-surface-variant mb-5">받고 싶은 알림을 선택하세요. 중복 선택 가능합니다.</p>
+
+            <div class="space-y-3 mb-6">
+                <label class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant hover:bg-surface-container cursor-pointer">
+                    <input type="checkbox" id="tg-opt-disclosure" checked class="mt-0.5 accent-secondary w-4 h-4 shrink-0">
+                    <div>
+                        <p class="font-label-md text-label-md">📢 공시 알림 + AI 요약</p>
+                        <p class="font-caption text-caption text-on-surface-variant">새 공시 발생 시 AI 3줄 요약과 함께 즉시 전송</p>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant hover:bg-surface-container cursor-pointer">
+                    <input type="checkbox" id="tg-opt-close" checked class="mt-0.5 accent-secondary w-4 h-4 shrink-0">
+                    <div>
+                        <p class="font-label-md text-label-md">📊 장 마감 리포트</p>
+                        <p class="font-caption text-caption text-on-surface-variant">매일 오후 3:35 관심 종목 등락률 요약</p>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 p-3 rounded-lg border border-outline-variant hover:bg-surface-container cursor-pointer">
+                    <input type="checkbox" id="tg-opt-alert" checked class="mt-0.5 accent-secondary w-4 h-4 shrink-0">
+                    <div>
+                        <p class="font-label-md text-label-md">🚀 급등·급락 알림</p>
+                        <p class="font-caption text-caption text-on-surface-variant">등락률 ±5% 초과 시 즉시 알림 (당일 1회)</p>
+                    </div>
+                </label>
+            </div>
+
+            <div class="bg-surface-container rounded-lg p-4 mb-5 text-center">
+                <p class="font-label-md text-label-md mb-1">봇 시작하기</p>
+                <p class="font-caption text-caption text-on-surface-variant mb-3">텔레그램에서 <b>@CheckStonkBot</b> 을 검색하거나 아래 버튼을 누르세요.</p>
+                <a href="https://t.me/CheckStonkBot" target="_blank"
+                   class="inline-flex items-center gap-2 bg-[#229ED9] text-white px-5 py-2.5 rounded-lg font-label-md text-label-md hover:opacity-90 transition-opacity">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.289c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.088 13.37l-2.948-.924c-.64-.203-.654-.64.136-.948l11.521-4.44c.534-.194 1.001.13.765.19z"/></svg>
+                    @CheckStonkBot 열기
+                </a>
+            </div>
+            <p class="font-caption text-caption text-on-surface-variant text-center" style="font-size:11px">봇에서 /add 종목명 으로 관심 종목을 등록하면 선택한 알림이 자동 발송됩니다.</p>
+        </div>
+    </div>
 </body>
 </html>
