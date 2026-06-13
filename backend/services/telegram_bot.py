@@ -21,6 +21,38 @@ def send(chat_id: int, text: str):
         pass
 
 
+def _send_buttons(chat_id: int, text: str, buttons: list[list[dict]]):
+    if not BOT_TOKEN:
+        return
+    try:
+        requests.post(
+            f"{_API}/sendMessage",
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+                "reply_markup": {"inline_keyboard": buttons},
+            },
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
+def _answer_callback(callback_query_id: str, text: str = ""):
+    if not BOT_TOKEN:
+        return
+    try:
+        requests.post(
+            f"{_API}/answerCallbackQuery",
+            json={"callback_query_id": callback_query_id, "text": text},
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+
 def set_webhook(url: str):
     if not BOT_TOKEN:
         return
@@ -46,6 +78,11 @@ def _prefs_text(prefs: dict) -> str:
 
 
 def handle_update(update: dict):
+    # 버튼 클릭 처리
+    if "callback_query" in update:
+        _handle_callback(update["callback_query"])
+        return
+
     msg = update.get("message") or update.get("edited_message")
     if not msg:
         return
@@ -154,41 +191,118 @@ def handle_update(update: dict):
         send(chat_id, "명령어를 인식하지 못했습니다. /help 를 입력해보세요.")
 
 
-def _handle_remove(chat_id: int, query: str):
-    from services.search import search_stocks
+def _handle_callback(cq: dict):
     import db
 
-    results = search_stocks(query, limit=1)
-    if results:
-        ticker = results[0]["code"]
-        name   = results[0]["name"]
-    else:
-        ticker = query.upper()
-        name   = ""
+    cq_id   = cq["id"]
+    chat_id = cq["from"]["id"]
+    data    = cq.get("data", "")
 
-    if db.remove_from_watchlist(chat_id, ticker):
-        label = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
-        send(chat_id, f"✅ {label} 관심 종목에서 삭제했습니다.")
+    parts  = data.split("|", 2)
+    action = parts[0] if parts else ""
+
+    if action == "add" and len(parts) >= 2:
+        ticker = parts[1]
+        name   = parts[2] if len(parts) >= 3 else ""
+        added  = db.add_to_watchlist(chat_id, ticker, name)
+        label  = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
+        _answer_callback(cq_id)
+        if added:
+            send(chat_id, f"✅ {label} 관심 종목에 추가했습니다.")
+        else:
+            send(chat_id, f"이미 등록된 종목입니다: {label}")
+
+    elif action == "rm" and len(parts) >= 2:
+        ticker = parts[1]
+        name   = parts[2] if len(parts) >= 3 else ""
+        _answer_callback(cq_id)
+        if db.remove_from_watchlist(chat_id, ticker):
+            label = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
+            send(chat_id, f"✅ {label} 관심 종목에서 삭제했습니다.")
+        else:
+            label = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
+            send(chat_id, f"❌ {label} 은 등록된 종목이 아닙니다.")
+
     else:
-        label = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
-        send(chat_id, f"❌ {label} 은 등록된 종목이 아닙니다.")
+        _answer_callback(cq_id)
 
 
 def _handle_add(chat_id: int, query: str):
     from services.search import search_stocks
     import db
 
-    results = search_stocks(query, limit=1)
-    if results:
+    results = search_stocks(query, limit=5)
+
+    if not results:
+        ticker = query.upper()
+        added  = db.add_to_watchlist(chat_id, ticker, "")
+        if added:
+            send(chat_id, f"✅ <b>{ticker}</b> 관심 종목에 추가했습니다.")
+        else:
+            send(chat_id, f"이미 등록된 종목입니다: <b>{ticker}</b>")
+        return
+
+    if len(results) == 1:
         ticker = results[0]["code"]
         name   = results[0]["name"]
-    else:
-        ticker = query.upper()
-        name   = ""
+        added  = db.add_to_watchlist(chat_id, ticker, name)
+        label  = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
+        if added:
+            send(chat_id, f"✅ {label} 관심 종목에 추가했습니다.")
+        else:
+            send(chat_id, f"이미 등록된 종목입니다: {label}")
+        return
 
-    added = db.add_to_watchlist(chat_id, ticker, name)
-    label = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
-    if added:
-        send(chat_id, f"✅ {label} 관심 종목에 추가했습니다.")
-    else:
-        send(chat_id, f"이미 등록된 종목입니다: {label}")
+    # 여러 결과 → 버튼으로 선택
+    buttons = []
+    for r in results:
+        code   = r["code"]
+        name   = r["name"]
+        market = r.get("market", "")
+        label  = f"{name} ({code})" + (f"  [{market}]" if market else "")
+        # callback_data 64바이트 제한 대응: 이름 40자 이하로 truncate
+        safe_name = name.replace("|", " ")[:40]
+        buttons.append([{"text": label, "callback_data": f"add|{code}|{safe_name}"}])
+
+    _send_buttons(chat_id, f"🔍 <b>'{query}'</b> 검색 결과입니다. 추가할 종목을 선택하세요:", buttons)
+
+
+def _handle_remove(chat_id: int, query: str):
+    import db
+
+    watchlist = db.get_watchlist(chat_id)
+    if not watchlist:
+        send(chat_id, "등록된 관심 종목이 없습니다.")
+        return
+
+    # 관심 종목 내에서 이름/티커로 검색
+    q = query.strip().lower()
+    matches = [
+        w for w in watchlist
+        if q in w["ticker"].lower() or q in (w.get("name") or "").lower()
+    ]
+
+    if not matches:
+        send(chat_id, f"❌ 관심 종목에서 '<b>{query}</b>'를 찾을 수 없습니다.\n/list 로 등록된 종목을 확인하세요.")
+        return
+
+    if len(matches) == 1:
+        ticker = matches[0]["ticker"]
+        name   = matches[0].get("name", "")
+        if db.remove_from_watchlist(chat_id, ticker):
+            label = f"<b>{name}</b> ({ticker})" if name else f"<b>{ticker}</b>"
+            send(chat_id, f"✅ {label} 관심 종목에서 삭제했습니다.")
+        else:
+            send(chat_id, "❌ 삭제 중 오류가 발생했습니다.")
+        return
+
+    # 여러 매칭 → 버튼으로 선택
+    buttons = []
+    for w in matches:
+        ticker = w["ticker"]
+        name   = w.get("name", "")
+        label  = f"{name} ({ticker})" if name else ticker
+        safe_name = (name or "").replace("|", " ")[:40]
+        buttons.append([{"text": label, "callback_data": f"rm|{ticker}|{safe_name}"}])
+
+    _send_buttons(chat_id, "🗑 삭제할 종목을 선택하세요:", buttons)
